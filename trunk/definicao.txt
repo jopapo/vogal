@@ -1,0 +1,35 @@
+### Dicionário de dados ###
+TABS (name);
+COLS (tabid, name, type, order, mandatory, location);
+ 
+### Exemplo de dados ###
+TABS {{"CLIENTE"},
+	  {"VENDEDOR"},
+	  etc...}
+COLS {{0,"CODIGO","NUMBER",0,1,5},
+	  {0,"NOME","VARCHAR",1,1,6},
+	  {1,"NOME_VENDEDOR","VARCHAR",0,0,7},
+	  etc...}
+
+### Exemplo na arquitetura ###
+// TABS
+Bloco 0 [~0,B1/0 
+		;~1,B1/1 
+		;~2,B1/2 
+		;~3,B1/3] //Tipo RIDS
+Bloco 1 ["CLIENTE",~2
+		;"COLS",~1
+		;"TABS",~0
+		;"VENDEDOR",~3] //Tipo INDICE
+Bloco 2 [~0,B3/0,B3/0,B3/0,B3/0,B3/0,B3/0
+		;~1,B3/1,B3/1,B3/1,B3/1,B3/1,B3/1
+		;~2,B3/2,B3/2,B3/2,B3/2,B3/2,B3/2
+		;~3,B3/3,B3/3,B3/3,B3/3,B3/3,B3/3
+		;~4,B3/4,B3/4,B3/4,B3/4,B3/4,B3/4
+		;~5,B3/5,B3/5,B3/5,B3/5,B3/5,B3/5
+		;~6,B3/6,B3/6,B3/6,B3/6,B3/6,B3/6
+		;~7,B3/7,B3/7,B3/7,B3/7,B3/7,B3/7
+		;~8,B3/8,B3/8,B3/8,B3/8,B3/8,B3/8
+		;~9,B3/9,B3/9,B3/9,B3/9,B3/9,B3/9
+		;~10,B3/10,B3/10,B3/10,B3/10,B3/10] //Tipo RIDS
+?????
