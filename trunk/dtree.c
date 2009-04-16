@@ -262,7 +262,7 @@ int createDataDictionary() {
 	pon = (pointer_p)p;
 	pon->valid = TRUE;
 	pon->more = FALSE;
-	pon->id = 0;
+	pon->id = tab_name;
 	pon->offset = 0;
 	p+=sizeof(pointer_t);
 	
