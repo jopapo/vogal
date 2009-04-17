@@ -40,6 +40,8 @@
 #define C_POINTER_OFFSET (C_POINTER_BLOCK_ID_SIZE + C_POINTER_BLOCK_OFFSET_SIZE) / 8 // 3 B = 24 bits
 #define C_POINTER_BLOCK_ID_SIZE 16 // 16 bits
 #define C_POINTER_BLOCK_OFFSET_SIZE 8 // 8 bits
+#define C_INDEX_SET_DATA_SIZE 62 // 62 bits
+#define C_INDEX_SET_DATA_FULL_BYTES C_INDEX_SET_DATA_SIZE / 8 // 7,75 -> 7
 
 #define C_LEAF_DATA_SIZE 15 // 15 bits
 #define C_LEAF_MORA_DATA_FLAG 1 // 1 bit
@@ -62,6 +64,15 @@ struct rid_st {
 };
 typedef struct rid_st rid_t;
 typedef rid_t * rid_p;
+
+typedef unsigned long long int data_def_t;
+struct data_st {
+	data_def_t valid:1;  // 1 bit = true/false
+	data_def_t more :1;  // 1 bit = true/false
+	data_def_t content:C_INDEX_SET_DATA_SIZE;  // 62 bits
+};
+typedef struct data_st data_t;
+typedef data_t * data_p;
 
 struct pointer_st {
 	unsigned int valid:1;    // 1 bit   = true/false
@@ -148,4 +159,5 @@ int lockFreeBlock(block_offset_p);
 int unlockBlock(block_offset_t);
 int writeOnEmptyBlock(generic_pointer_p,block_offset_p);
 int writeOnBlock(generic_pointer_p,block_offset_t);
+int writeIt(generic_pointer_p);
 

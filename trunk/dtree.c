@@ -54,10 +54,9 @@ int main(int argc, char** argv)
 	
 	
 	pDb = fopen(C_FILENAME, "r+");
-	
+
 	// Se o arquivo não existir
 	if (!pDb) {
-		
 		if (initialize())  {
 			pDb = fopen(C_FILENAME, "r+");
 			if (!pDb) {
@@ -73,7 +72,6 @@ int main(int argc, char** argv)
 			perror("Impossível inicializar base!");
 			return C_EXIT_FAILURE;
 		}
-
 	}
 	
 	if (!bufferize()) {
@@ -200,6 +198,11 @@ int writeOnBlock(generic_pointer_p buf, block_offset_t block) {
 	return TRUE;
 }
 
+int writeIt(generic_pointer_p buf) {
+	block_offset_p pBlock;
+	return writeOnEmptyBlock(buf, pBlock);
+}
+
 void freeBuffer(generic_pointer_p buf) {
 	if (buf) {
 		free(buf);
@@ -211,32 +214,46 @@ int createDataDictionary() {
 	int i;
 	int res = FALSE;
 	
-	#define C_TABS_BUFS 2
-	#define C_COLS_BUFS 7
-	
-	#define C_TABS_I 0
+	#define C_OBJS_I 0
 	#define C_COLS_I 1
 
-	generic_pointer_p
-		tabs_p[C_TABS_BUFS] = {NULL, NULL},
-		cols_p[C_COLS_BUFS] = {NULL, NULL, NULL, NULL, NULL, NULL, NULL};
+	#define C_OBJS_NAME_I 0
 	
+	#define C_COLS_TABID_I 1
+	#define C_COLS_NAME_I 2
+	#define C_COLS_TYPE_I 3
+	#define C_COLS_ORDER_I 4
+	#define C_COLS_MANDATORY_I 5
+	#define C_COLS_LOCATION_I 6
+	
+	#define C_COLS_FIRST_COL_I C_COLS_TABID_I
+	#define C_COLS_LAST_COL_I C_COLS_LOCATION_I
+
+	generic_pointer_p
+		objs_p[] = {NULL, NULL},
+		cols_p[] = {NULL, NULL, NULL, NULL, NULL, NULL, NULL};
+	
+	block_offset_t 
+		objs_cols_loc[] = {2, 3, 4, 5, 6, 7, 8};
+
 	// Inicializa buffers das tabelas
-	for (i = 0; i < C_TABS_BUFS; i++) { 
-		tabs_p[i] = blankBuffer();
-		if (!createStructure(C_BLOCK_TYPE_MAIN_TAB, tabs_p[i]))
+	for (i = 0; i < sizeof(objs_p) / sizeof(objs_p[0]); i++) { 
+		objs_p[i] = blankBuffer();
+		if (!createStructure(C_BLOCK_TYPE_MAIN_TAB, objs_p[i]))
 			goto free;
 	}
 	
 	// Inicializa buffers das colunas
-	for (i = 0; i < C_COLS_BUFS; i++) { 
+	for (i = 0; i < sizeof(cols_p) / sizeof(cols_p[0]); i++) { 
 		cols_p[i] = blankBuffer();
-		if (!createStructure(C_BLOCK_TYPE_MAIN_TAB, cols_p[i]))
+		if (!createStructure(C_BLOCK_TYPE_INDEX, cols_p[i]))
 			goto free;
 	}
 	
+	// ### OBJS ###
+	
 	// Preenchimento dos dados
-	generic_pointer_p p = tabs_p[C_TABS_I];
+	generic_pointer_p p = objs_p[C_OBJS_I];
 	p+=sizeof(block_header_t);
 
 	// Ponteiro do último bloco (Se é ele mesmo, não há pq preencher)
@@ -247,35 +264,117 @@ int createDataDictionary() {
 	pon->offset = 0;
 	p+=sizeof(pointer_t);
 	
-	// RID do primeiro registro (Sempre começará do zero e nunca repetirá dentro da mesma tabela)
-	rid_p rid = (rid_p)p;
-	rid->valid = TRUE;
-	rid->more = FALSE;
-	rid->id = 0;
-	p+=sizeof(rid_t);
+	char * objsName[] = {"OBJS", "COLS"};
+
+	// RID dos primeiros registros: OBJS e COLS (Sempre começará do zero e nunca repetirá dentro da mesma tabela)
+	for (i = 0; i < sizeof(objsName) / sizeof(objsName[0]); i++) {
+		rid_p rid = (rid_p)p;
+		rid->valid = TRUE;
+		rid->more = FALSE;
+		rid->id = i;
+		p+=sizeof(rid_t);
+	}
 	
-	// Ponteiro da única coluna associada ao RID => name
-	block_offset_t tab_name = -1;
-	if (!lockFreeBlock(&tab_name))
-		goto free;
+	// Somente a coluna NAME da tabela OBJS
+	for (i = 0; i < 1; i++) {
+		// Ponteiro da coluna name associada ao RID
+		pon = (pointer_p)p;
+		pon->valid = TRUE;
+		pon->more = FALSE;
+		pon->id = objs_cols_loc[i];
+		pon->offset = 0;
+		p+=sizeof(pointer_t);
+	}
 	
+	// Conteúdo da coluna name da OBJS
+	p = cols_p[C_OBJS_NAME_I];
+	p+=sizeof(block_header_t);
+	
+	for (i = 0; i < sizeof(objsName) / sizeof(objsName[0]); i++) {
+		data_p data = (data_p)p;
+		data->valid = TRUE;
+		data->more = FALSE;
+		data->content = (* ((data_def_t *) objsName[i]));
+		p+=sizeof(data_t);
+
+		rid_p rid = (rid_p)p;
+		rid->valid = TRUE;
+		rid->more = FALSE;
+		rid->id = i;
+		p+=sizeof(rid_t);
+	}
+
+
+	// ### COLS ###
+	
+	// Preenchimento dos dados
+	p = objs_p[C_COLS_I];
+	p+=sizeof(block_header_t);
+
+	// Ponteiro do último bloco (Se é ele mesmo, não há pq preencher)
 	pon = (pointer_p)p;
-	pon->valid = TRUE;
+	pon->valid = FALSE;
 	pon->more = FALSE;
-	pon->id = tab_name;
+	pon->id = 0;
 	pon->offset = 0;
 	p+=sizeof(pointer_t);
 	
-free:
-	for (i = 0; i < C_TABS_BUFS; i++)
-		freeBuffer(tabs_p[i]);
-	for (i = 0; i < C_COLS_BUFS; i++)
-		freeBuffer(cols_p[i]);
+	char * colsName[] = {"name", "tabId", "name", "type", "order", "mandatory", "location"};
+	int colsTabIds[] = {0, 1, 1, 1, 1, 1, 1};
+	char * colsType[] = {"VARCHAR", "RID", "VARCHAR", "VARCHAR", "NUMBER", "NUMBER", "NUMBER"};
+	int colsOrder[] = {0, 0, 1, 2, 3, 4, 5};
+	int colsMandatory[] = {1, 1, 1, 1, 1, 1, 1};
 
-	// Se deu erro destrava os blocos
-	if (!res) {
-		unlockBlock(tab_name);
+	// RID dos registros
+	for (i = 0; i < sizeof(colsName) / sizeof(colsName[0]); i++) {
+		rid_p rid = (rid_p)p;
+		rid->valid = TRUE;
+		rid->more = FALSE;
+		rid->id = i;
+		p+=sizeof(rid_t);
 	}
+	
+	// 7 coluna, entre 1 e 7
+	for (i = C_COLS_FIRST_COL_I; i <= C_COLS_LAST_COL_I; i++) {
+		// Ponteiro das colunas associadas ao RID
+		pon = (pointer_p)p;
+		pon->valid = TRUE;
+		pon->more = FALSE;
+		pon->id = objs_cols_loc[i];
+		pon->offset = 0;
+		p+=sizeof(pointer_t);
+	}
+	
+	// Conteúdo da coluna name da OBJS na COLS
+	p = cols_p[C_COLS_NAME_I];
+	p+=sizeof(block_header_t);
+	
+	/*for (i = 0; i < sizeof(colsName) / sizeof(colsName[0]); i++) {
+		data_p data = (data_p)p;
+		data->valid = TRUE;
+		data->more = FALSE;
+		data->content = (* ((data_def_t *) objsName[i]));
+		p+=sizeof(data_t);
+
+		rid_p rid = (rid_p)p;
+		rid->valid = TRUE;
+		rid->more = FALSE;
+		rid->id = i;
+		p+=sizeof(rid_t);
+	}*/
+	
+	// Gravação dos blocos de dados
+	for (i = 0; i < sizeof(objs_p) / sizeof(objs_p[0]); i++)
+		writeOnBlock(objs_p[i], i);
+	for (i = 0; i < sizeof(cols_p) / sizeof(cols_p[0]); i++)
+		writeOnBlock(cols_p[i], objs_cols_loc[i]);
+	
+free:
+	// E então, libera memória
+	for (i = 0; i < sizeof(objs_p) / sizeof(objs_p[0]); i++)
+		freeBuffer(objs_p[i]);
+	for (i = 0; i < sizeof(cols_p) / sizeof(cols_p[0]); i++)
+		freeBuffer(cols_p[i]);
 
 	return res;
 	
@@ -359,7 +458,7 @@ int unlockBlock(block_offset_t pos) {
 generic_pointer_p blankBuffer() {
 	generic_pointer_p buf = (generic_pointer_p) malloc(C_BLOCK_SIZE);
 	
-	DEBUG("Obtendo buffer vazio!");
+	//DEBUG("Obtendo buffer vazio!");
 	memset(buf, 0x00, C_BLOCK_SIZE);
 	
 	return buf;
