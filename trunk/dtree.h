@@ -40,12 +40,11 @@
 #define C_POINTER_OFFSET (C_POINTER_BLOCK_ID_SIZE + C_POINTER_BLOCK_OFFSET_SIZE) / 8 // 3 B = 24 bits
 #define C_POINTER_BLOCK_ID_SIZE 16 // 16 bits
 #define C_POINTER_BLOCK_OFFSET_SIZE 8 // 8 bits
-#define C_INDEX_SET_DATA_SIZE 62 // 62 bits
-#define C_INDEX_SET_DATA_FULL_BYTES C_INDEX_SET_DATA_SIZE / 8 // 7,75 -> 7
 
 #define C_LEAF_DATA_SIZE 15 // 15 bits
 #define C_LEAF_MORA_DATA_FLAG 1 // 1 bit
 
+#define C_MAX_SIZE_PER_DATA_UNIT 127 // 7 bits = 128
 
 // Masks
 #define C_BLOCK_TYPE_MAIN_TAB 0
@@ -62,26 +61,48 @@ struct rid_st {
 	unsigned int more :1;  // 1 bit = true/false
 	unsigned int id   :30; // 30 bits -> 2^30 = 1.073.741.824
 };
-typedef struct rid_st rid_t;
-typedef rid_t * rid_p;
 
-typedef unsigned long long int data_def_t;
-struct data_st {
-	data_def_t valid:1;  // 1 bit = true/false
-	data_def_t more :1;  // 1 bit = true/false
-	data_def_t content:C_INDEX_SET_DATA_SIZE;  // 62 bits
+// Aqui foi pensado em definir o número 255 (1111 1111) como identificador
+// que o tamanho é maior, porém, essa metodologia ia trazer uma malefício mto 
+// grande que seria. Se, por acaso, o tamanh fosse maior que 255, digamos
+// 1000: Precisaríamos de, no mínimo 4 bytes para identificá-lo, pois ficaria algo
+// semelhante a:
+//   variable_size_st a = {1111 1111} -- 255
+//   variable_size_st b = {1111 1111} -- 255
+//   variable_size_st c = {1111 1111} -- 255
+//   variable_size_st d = {0001 0100} -- 20 = total 1000B
+// Mas com o indicador "more", podemos tratar a informação como binária, ou seja,
+// poderíamos identificar até 14 bits de tamanho em apenas 2 bytes = 16384. Portanto
+// o tamanho acima poderia ser identificado da forma que seja, tendo uma progressão
+// geométrica ao invés de meramente aritmética:
+//   variable_size_st a = {0000111, 1} 
+//   variable_size_st b = {1101000, 0} -- 00001111101000 = 1000
+// Enquanto a primeira forma gera uma maior aproveitamento do primeiro byte,
+// a segunda forma gera uma desperdício extremamente menor em caso de tamanhos
+// maiores. Resumindo, para representar o que a segunda forma pd com 2 bytes,
+// a primeira forma necessitaria de 455 bytes.
+struct variable_size_st {
+	unsigned char size:7; // 0 - 127
+	unsigned char more:1; // true/false
 };
-typedef struct data_st data_t;
-typedef data_t * data_p;
+
+typedef unsigned char variable_size_data_st; // Normalmente será um array deste
+
+/*struct data_st {
+	unsigned char     valid:1;  // 1 bit = true/false
+	unsigned char     more :1;  // 1 bit = true/false
+	unsigned char     usedB:2;  // 2 bits = max 4 => Bytes usados no campo content
+	unsigned char 	       :4;  // 4 bits livres
+	unsigned long int content; // 32 bits
+}; // 48 bits / 5 bytes
 
 struct pointer_st {
-	unsigned int valid:1;    // 1 bit   = true/false
-	unsigned int more:1;	 // 1 bit   = true/false
-	unsigned int id:20;     // 20 bits = 1.048.576
-	unsigned int offset:10; // 10 bits = 1.024
-}; // 32 bits
-typedef struct pointer_st pointer_t;
-typedef pointer_t * pointer_p;
+	unsigned long int valid :1;    // 1 bit   = true/false
+	unsigned long int more  :1;	 // 1 bit   = true/false
+	unsigned long int id    :20;     // 20 bits = 1.048.576
+	unsigned long int offset:8; // 10 bits = 1.024
+}; // 32 bits / 4 bytes
+*/
 
 struct block_header_st {
 	unsigned char valid:1;
@@ -89,49 +110,6 @@ struct block_header_st {
 	unsigned char type :3;
 	unsigned char 	   :3; // 3 bits sobram
 };
-typedef struct block_header_st block_header_t;
-typedef block_header_t *	   block_header_p;
-
-/*
-// Indexes
-
-struct index_data_st {
-	unsigned char content; // 8 bits
-};
-typedef struct index_data_st index_data_t;
-
-
-// Main index
-
-struct index_entry_st {
-	index_data_t data; // 8 bits
-	pointer_t    pointer; // 24 bits
-}; // 32 bits
-typedef struct index_entry_st index_entry_t;
-
-struct index_block_header_st {
-	block_header_t header;
-	index_entry_t  entry;
-};
-typedef struct index_block_header_st index_block_header_t;
-typedef index_block_header_t *	     index_block_header_p;
-
-
-// Index leaf
-
-struct index_leaf_entry_st {
-	unsigned short size:C_LEAF_DATA_SIZE; // 2^15 = 32768
-	unsigned short more:C_LEAF_MORA_DATA_FLAG;
-};
-typedef struct index_leaf_entry_st index_leaf_entry_t;
-
-struct leaf_block_header_st {
-	block_header_t     header; // 8 bits
-	index_leaf_entry_t entry; // 32 bits
-}; // 40 bits
-typedef struct leaf_block_header_st leaf_block_header_t;
-typedef leaf_block_header_t *	    leaf_block_header_p;
-*/
 
 // ### TIPOS ###
 typedef unsigned char * generic_pointer_p;
@@ -157,7 +135,11 @@ generic_pointer_p blankBuffer();
 void freeBuffer(generic_pointer_p);
 int lockFreeBlock(block_offset_p);
 int unlockBlock(block_offset_t);
+generic_pointer_p writeVariableSizeData(generic_pointer_p, generic_pointer_p, int);
 int writeOnEmptyBlock(generic_pointer_p,block_offset_p);
 int writeOnBlock(generic_pointer_p,block_offset_t);
 int writeIt(generic_pointer_p);
-
+generic_pointer_p writeInt(int, generic_pointer_p);
+generic_pointer_p writeString(char *, generic_pointer_p);
+generic_pointer_p writeData(generic_pointer_p, generic_pointer_p, int);
+generic_pointer_p writeRidPointer(block_offset_t, generic_pointer_p);
