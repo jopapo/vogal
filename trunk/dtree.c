@@ -262,11 +262,11 @@ int createDataDictionary() {
 	p+=sizeof(struct block_header_st);
 
 	// Ponteiro do último bloco (Se é ele mesmo, não há pq preencher)
-	unsigned char id = 0, offset = 0;
-	p = writeVariableSizeData(p, &id, 1);
-	p = writeVariableSizeData(p, &offset, 1);
+	if (!writeBlockPointer(0, 0, &p))
+		goto free;
 																								
-	char * objsName[] = {"OBJS", "COLS"};
+	char * objsName[] = {"COLS", "OBJS"}; // As colunas sempre devem ser ordenadas
+	int objsNameRids[] = {1, 0};
 
 	DEBUG("Gravando cabeçalho rowids da tabela TABS");
 
@@ -279,26 +279,23 @@ int createDataDictionary() {
 		p+=sizeof(struct rid_st);
 		// Somente a coluna NAME da tabela OBJS
 		// Ponteiro da coluna name associada ao RID
-		id = objs_cols_loc[i];
-		offset = 0;
-		p = writeVariableSizeData(p, &id, 1);
-		p = writeVariableSizeData(p, &offset, 1);
+		if (!writeBlockPointer(objs_cols_loc[i], 0, &p))
+			goto free;
 	}
 	
 	// Conteúdo da coluna name da OBJS
 	p = cols_p[C_OBJS_NAME_I];
 	p+=sizeof(struct block_header_st);
 	
+	// Deve ser ordenado
 	DEBUG("Gravando a coluna name da tabela TABS");
-/*
 	for (i = 0; i < sizeof(objsName) / sizeof(objsName[0]); i++) {
-		writeString(objsName[i], p);
-		p+=sizeof(data_t);
-		writeRidPointer(i, p);
-		p+=sizeof(rid_t);
+		if (!writeString(objsName[i], &p))
+			goto free;
+		if (!writeRidPointer(objsNameRids[i], &p))
+			goto free;
 	}
-*/
-	/*
+
 	// ### COLS ###
 	
 	DEBUG("Gravando a tabela COLS");
@@ -315,11 +312,15 @@ int createDataDictionary() {
 	pon->offset = 0;
 	p+=sizeof(pointer_t);
 	
-	int colsTabIds[] = {0, 1, 1, 1, 1, 1, 1};
-	char * colsName[] = {"name", "tabId", "name", "type", "order", "mandatory", "location"};
-	char * colsType[] = {"VARCHAR", "RID", "VARCHAR", "VARCHAR", "NUMBER", "NUMBER", "NUMBER"};
+	int colsTabId[] = {0, 1, 1, 1, 1, 1, 1};
+	int colsTabIdRids[] = {0, 1, 2, 3, 4, 5, 6};
+	char * colsName[] = {"location", "mandatory", "name", "name", "order", "tabId", "type"};
+	int colsNameRids[] = {9, 9, 0, 2, 9, 1, 9};
+	char * colsType[] = {"NUMBER", "NUMBER", "NUMBER", "RID", "VARCHAR", "VARCHAR", "VARCHAR"};
 	int colsOrder[] = {0, 0, 1, 2, 3, 4, 5};
 	int colsMandatory[] = {1, 1, 1, 1, 1, 1, 1};
+
+	int colsNameRids[] = {9, 9, 9, 9, 9, 9, 9};
 
 	// RID dos registros
 	DEBUG("Gravando RIDs da tabela COLS");
@@ -424,9 +425,9 @@ free:
 // Importante!!! Implementar mecanismo de redução do "size" para o mínimo possível, ou seja,
 // qdo vier um long long int de 64 bits com o valor "100", reduzí-lo para 8 bits (1 byte), pois 
 // é o suficiente para representar esse valor no banco.
-generic_pointer_p writeVariableSizeData(generic_pointer_p dest, generic_pointer_p src, int size) {
+int writeVariableSizeData(generic_pointer_p* dest, generic_pointer_p src, int size) {
 	do {
-		struct variable_size_st * var_p = (struct variable_size_st *)dest;
+		struct variable_size_st * var_p = (struct variable_size_st *)(*dest);
 		var_p->more = size > C_MAX_SIZE_PER_DATA_UNIT;
 		if (var_p->more) {
 			var_p->size = C_MAX_SIZE_PER_DATA_UNIT;
@@ -435,33 +436,41 @@ generic_pointer_p writeVariableSizeData(generic_pointer_p dest, generic_pointer_
 			var_p->size = size;
 			size = 0;
 		}
-		dest+=sizeof(struct variable_size_st);
-		variable_size_data_st * varData_p = (variable_size_data_st *)dest;
+		(*dest)+=sizeof(struct variable_size_st);
+		variable_size_data_st * varData_p = (variable_size_data_st *)(*dest);
 		memcpy(varData_p, src, var_p->size);
-		dest+=sizeof(struct variable_size_st);
+		(*dest)+=sizeof(struct variable_size_st);
 		src+=var_p->size;
 	} while (size);
-	return dest;
+	return TRUE;
 }
 
-generic_pointer_p writeInt(int intValue, generic_pointer_p where) {
+int writeInt(int intValue, generic_pointer_p* where) {
 	return writeData(where, (generic_pointer_p)&intValue, sizeof(int));
 }
 
-generic_pointer_p writeString(char * strValue, generic_pointer_p where) {
+int writeString(char * strValue, generic_pointer_p* where) {
 	return writeData(where, (generic_pointer_p)strValue, strlen(strValue));
 }
 
-generic_pointer_p writeData(generic_pointer_p dest, generic_pointer_p src, int dataSize) {
-	dest = writeVariableSizeData(dest, (generic_pointer_p)&dataSize, sizeof(dataSize));
-	memcpy(dest, src, dataSize);
-	return dest+dataSize;
+int writeRidPointer(block_offset_t rid, generic_pointer_p* where) {
+	return writeData(where, (generic_pointer_p)&rid, sizeof(rid));
 }
 
-generic_pointer_p writeRidPointer(block_offset_t rid, generic_pointer_p where) {
-	where = writeVariableSizeData(where, (generic_pointer_p)&rid, sizeof(rid));
-	memcpy(where, &rid, sizeof(rid));
-	return where+sizeof(rid);
+int writeBlockPointer(block_offset_t id, block_offset_t offset, generic_pointer_p* dest) {
+	if (!writeData(dest, (generic_pointer_p)&id, 4))
+		return FALSE;
+	if (!writeData(dest, (generic_pointer_p)&offset, 21))
+		return FALSE;
+	return TRUE;
+}
+
+int writeData(generic_pointer_p* dest, generic_pointer_p src, int dataSize) {
+	if (!writeVariableSizeData(dest, (generic_pointer_p)&dataSize, sizeof(dataSize)))
+		return FALSE;
+	memcpy((*dest), src, dataSize);
+	(*dest) += dataSize;
+	return TRUE;
 }
 
 int insertData() {
