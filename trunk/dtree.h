@@ -88,22 +88,6 @@ struct variable_size_st {
 
 typedef unsigned char variable_size_data_st; // Normalmente será um array deste
 
-/*struct data_st {
-	unsigned char     valid:1;  // 1 bit = true/false
-	unsigned char     more :1;  // 1 bit = true/false
-	unsigned char     usedB:2;  // 2 bits = max 4 => Bytes usados no campo content
-	unsigned char 	       :4;  // 4 bits livres
-	unsigned long int content; // 32 bits
-}; // 48 bits / 5 bytes
-
-struct pointer_st {
-	unsigned long int valid :1;    // 1 bit   = true/false
-	unsigned long int more  :1;	 // 1 bit   = true/false
-	unsigned long int id    :20;     // 20 bits = 1.048.576
-	unsigned long int offset:8; // 10 bits = 1.024
-}; // 32 bits / 4 bytes
-*/
-
 struct block_header_st {
 	unsigned char valid:1;
 	unsigned char empty:1;

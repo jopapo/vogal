@@ -279,7 +279,7 @@ int createDataDictionary() {
 		p+=sizeof(struct rid_st);
 		// Somente a coluna NAME da tabela OBJS
 		// Ponteiro da coluna name associada ao RID
-		if (!writeBlockPointer(objs_cols_loc[i], 0, &p))
+		if (!writeBlockPointer(objs_cols_loc[0], i, &p))
 			goto free;
 	}
 	
@@ -302,37 +302,60 @@ int createDataDictionary() {
 
 	// Preenchimento dos dados
 	p = objs_p[C_COLS_I];
-	p+=sizeof(block_header_t);
+	p+=sizeof(struct block_header_st);
 
 	// Ponteiro do último bloco (Se é ele mesmo, não há pq preencher)
-	pon = (pointer_p)p;
-	pon->valid = FALSE;
-	pon->more = FALSE;
-	pon->id = 0;
-	pon->offset = 0;
-	p+=sizeof(pointer_t);
+	if (!writeBlockPointer(0, 0, &p))
+		goto free;
+	
+	/*
+	 Estrutura de dados deve formatar o seguinte:
+	 
+	 TABS	name
+	 0~		COLS [1]
+	 1~		TABS [0]
+	 
+	 COLS   tabId   name		type		order   mandatory  location
+	 0~		0 [0]   locat [6]	NUMBER [4]  0 [0]   1 [0]	   2 [0]
+	 1~		1 [1]   manda [5]   NUMBER [5]  0 [1]   1 [1]	   3 [1]
+	 2~		1 [2]   name [0]	NUMBER [6]  1 [2]   1 [2]	   4 [2]
+	 3~		1 [3]   name [2]	RID [1]		2 [3]   1 [3]	   5 [3]
+	 4~		1 [4]   order [4]   VARCHAR [0] 3 [4]   1 [4]	   6 [4]
+	 5~		1 [5]   tabId [1]   VARCHAR [2] 4 [5]   1 [5]	   7 [5]
+	 6~		1 [6]   type [3]	VARCHAR [3] 5 [6]   1 [6]	   8 [6]
+	 
+	 */
+
+	//int colsOffsets[][] = {{},{},{},{},{},{},{}};
 	
 	int colsTabId[] = {0, 1, 1, 1, 1, 1, 1};
 	int colsTabIdRids[] = {0, 1, 2, 3, 4, 5, 6};
+	
 	char * colsName[] = {"location", "mandatory", "name", "name", "order", "tabId", "type"};
-	int colsNameRids[] = {9, 9, 0, 2, 9, 1, 9};
+	int colsNameRids[] = {6, 5, 0, 2, 4, 1, 4};
+	
 	char * colsType[] = {"NUMBER", "NUMBER", "NUMBER", "RID", "VARCHAR", "VARCHAR", "VARCHAR"};
+	int colsTypeRids[] = {4, 5, 6, 1, 0, 2, 3};
+	
 	int colsOrder[] = {0, 0, 1, 2, 3, 4, 5};
+	int * colsOrderRids = colsTabIdRids;
+	
 	int colsMandatory[] = {1, 1, 1, 1, 1, 1, 1};
-
-	int colsNameRids[] = {9, 9, 9, 9, 9, 9, 9};
+	int * colsMandatoryRids = colsOrderRids;
 
 	// RID dos registros
 	DEBUG("Gravando RIDs da tabela COLS");
 
 	for (i = 0; i < sizeof(colsName) / sizeof(colsName[0]); i++) {
-		rid_p rid = (rid_p)p;
+		struct rid_st * rid = (struct rid_st *)p;
 		rid->valid = TRUE;
 		rid->more = FALSE;
 		rid->id = i;
-		p+=sizeof(rid_t);
-		
-		
+		p+=sizeof(struct rid_st);
+		// Somente a coluna NAME da tabela OBJS
+		// Ponteiro da coluna name associada ao RID
+		if (!writeBlockPointer(cols_cols_loc[i], 0, &p))
+			goto free;
 	}
 	
 	DEBUG("Obtendo blocos das colunas da tabela COLS");
