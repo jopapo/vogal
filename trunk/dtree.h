@@ -31,8 +31,9 @@
 
 // Blocks
 
-#define C_BLOCK_SIZE 1024 // 1024 B = 1 KB
-#define C_MAX_BLOCKS 4096
+// Observação: Aumentado para possibilitar a gravação do dicionário de dados sem dividir em blocos
+#define C_BLOCK_SIZE 4096 // 4096 B = 4 KB
+#define C_MAX_BLOCKS 5000
 #define C_BLOCK_HEADER_OFFSET 0
 
 #define C_BLOCK_HEADER_SIZE 1 // 1 B = 8 bits (4 sobram)
@@ -43,8 +44,6 @@
 
 #define C_LEAF_DATA_SIZE 15 // 15 bits
 #define C_LEAF_MORA_DATA_FLAG 1 // 1 bit
-
-#define C_MAX_SIZE_PER_DATA_UNIT 127 // 7 bits = 128
 
 // Masks
 #define C_BLOCK_TYPE_MAIN_TAB 0
@@ -86,8 +85,6 @@ struct variable_size_st {
 	unsigned char more:1; // true/false
 };
 
-typedef unsigned char variable_size_data_st; // Normalmente será um array deste
-
 struct block_header_st {
 	unsigned char valid:1;
 	unsigned char empty:1;
@@ -119,12 +116,12 @@ generic_pointer_p blankBuffer();
 void freeBuffer(generic_pointer_p);
 int lockFreeBlock(block_offset_p);
 int unlockBlock(block_offset_t);
-int writeVariableSizeData(generic_pointer_p*, generic_pointer_p, int);
 int writeOnEmptyBlock(generic_pointer_p,block_offset_p);
 int writeOnBlock(generic_pointer_p,block_offset_t);
 int writeIt(generic_pointer_p);
 int writeInt(int, generic_pointer_p*);
 int writeString(char *, generic_pointer_p*);
+int writeDataSize(generic_pointer_p*, generic_pointer_p, int);
 int writeData(generic_pointer_p*, generic_pointer_p, int);
 int writeRidPointer(block_offset_t, generic_pointer_p*);
 int writeBlockPointer(block_offset_t, block_offset_t, generic_pointer_p*);
