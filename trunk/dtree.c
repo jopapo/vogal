@@ -298,16 +298,6 @@ int createDataDictionary() {
 
 	// ### COLS ###
 	
-	DEBUG("Gravando a tabela COLS");
-
-	// Preenchimento dos dados
-	p = objs_p[C_COLS_I];
-	p+=sizeof(struct block_header_st);
-
-	// Ponteiro do último bloco (Se é ele mesmo, não há pq preencher)
-	if (!writeBlockPointer(0, 0, &p))
-		goto free;
-	
 	/*
 	 Estrutura de dados deve formatar o seguinte:
 	 
@@ -326,7 +316,14 @@ int createDataDictionary() {
 	 
 	 */
 
-	//int colsOffsets[][] = {{},{},{},{},{},{},{}};
+	int colsOffsets[7][6] = 
+		{{0,6,4,0,0,0},
+		 {1,5,5,1,1,1},
+		 {2,0,6,2,2,2},
+		 {3,2,1,3,3,3},
+		 {4,4,0,4,4,4},
+		 {5,1,2,5,5,5},
+		 {6,3,3,6,6,6}};
 	
 	int colsTabId[] = {0, 1, 1, 1, 1, 1, 1};
 	int colsTabIdRids[] = {0, 1, 2, 3, 4, 5, 6};
@@ -343,83 +340,84 @@ int createDataDictionary() {
 	int colsMandatory[] = {1, 1, 1, 1, 1, 1, 1};
 	int * colsMandatoryRids = colsOrderRids;
 
-	// RID dos registros
-	DEBUG("Gravando RIDs da tabela COLS");
 
+	DEBUG("Gravando a tabela COLS");
+
+	// Preenchimento dos dados
+	p = objs_p[C_COLS_I];
+	p+=sizeof(struct block_header_st);
+
+	// Ponteiro do último bloco (Se é ele mesmo, não há pq preencher)
+	if (!writeBlockPointer(0, 0, &p))
+		goto free;
+	
+	// RID dos registros (ESTÁ ULTRAPASSANDO O TAMNHO DO BLOCO!!!)
+	DEBUG("Gravando RIDs da tabela COLS");
 	for (i = 0; i < sizeof(colsName) / sizeof(colsName[0]); i++) {
 		struct rid_st * rid = (struct rid_st *)p;
 		rid->valid = TRUE;
 		rid->more = FALSE;
 		rid->id = i;
 		p+=sizeof(struct rid_st);
-		// Somente a coluna NAME da tabela OBJS
-		// Ponteiro da coluna name associada ao RID
-		if (!writeBlockPointer(cols_cols_loc[i], 0, &p))
-			goto free;
-	}
-	
-	DEBUG("Obtendo blocos das colunas da tabela COLS");
-
-	// 7 coluna, entre 1 e 7
-	for (i = C_COLS_FIRST_COL_I; i <= C_COLS_LAST_COL_I; i++) {
-			// Ponteiro das colunas associadas ao RID
-		pon = (pointer_p)p;
-		pon->valid = TRUE;
-		pon->more = FALSE;
-		pon->id = objs_cols_loc[i];
-		pon->offset = 0;
-		p+=sizeof(pointer_t);
+		// Gravar os ponteiros e offsets de cada registro
+		int r;
+		for (r = 0; r < sizeof(colsOffsets[i]) / sizeof(colsOffsets[i][0]); r++) {
+			// Ponteiro da coluna name associada ao RID
+			if (!writeBlockPointer(objs_cols_loc[i], colsOffsets[i][r], &p))
+				goto free;
+		}
+		
 	}
 	
 	// Conteúdo da coluna "tabsId" da COLS
 	DEBUG("Gravando dados da coluna tabId da tabela COLS");
 	p = cols_p[C_COLS_TABID_I];
-	p+=sizeof(block_header_t);
-	for (i = 0; i < sizeof(colsTabIds) / sizeof(colsTabIds[0]); i++) {
-		writeInt(colsTabIds[i], p);
-		p+=sizeof(data_t);
-		writeRidPointer(i, p);
-		p+=sizeof(rid_t);
+	p+=sizeof(struct block_header_st);
+	for (i = 0; i < sizeof(colsTabId) / sizeof(colsTabId[0]); i++) {
+		if (!writeInt(colsTabId[i], &p))
+			goto free;
+		if (!writeRidPointer(colsTabIdRids[i], &p))
+			goto free;
 	}
 	// Conteúdo da coluna "name" da COLS
 	DEBUG("Gravando dados da coluna name da tabela COLS");
 	p = cols_p[C_COLS_NAME_I];
-	p+=sizeof(block_header_t);
+	p+=sizeof(struct block_header_st);
 	for (i = 0; i < sizeof(colsName) / sizeof(colsName[0]); i++) {
-		writeString(colsName[i], p);
-		p+=sizeof(data_t);
-		writeRidPointer(i, p);
-		p+=sizeof(rid_t);
+		if (!writeString(colsName[i], &p))
+			goto free;
+		if (!writeRidPointer(colsNameRids[i], &p))
+			goto free;
 	}
 	// Conteúdo da coluna "type" da COLS
 	DEBUG("Gravando dados da coluna type da tabela COLS");
 	p = cols_p[C_COLS_TYPE_I];
-	p+=sizeof(block_header_t);
+	p+=sizeof(struct block_header_st);
 	for (i = 0; i < sizeof(colsType) / sizeof(colsType[0]); i++) {
-		writeString(colsType[i], p);
-		p+=sizeof(data_t);
-		writeRidPointer(i, p);
-		p+=sizeof(rid_t);
+		if (!writeString(colsType[i], &p))
+			goto free;
+		if (!writeRidPointer(colsTypeRids[i], &p))
+			goto free;
 	}
 	// Conteúdo da coluna "order" da COLS
 	DEBUG("Gravando dados da coluna order da tabela COLS");
 	p = cols_p[C_COLS_ORDER_I];
-	p+=sizeof(block_header_t);
+	p+=sizeof(struct block_header_st);
 	for (i = 0; i < sizeof(colsOrder) / sizeof(colsOrder[0]); i++) {
-		writeInt(colsOrder[i], p);
-		p+=sizeof(data_t);
-		writeRidPointer(i, p);
-		p+=sizeof(rid_t);
+		if (!writeInt(colsOrder[i], &p))
+			goto free;
+		if (!writeRidPointer(colsOrderRids[i], &p))
+			goto free;
 	}
 	// Conteúdo da coluna "mandatory" da COLS
 	DEBUG("Gravando dados da coluna mandatory da tabela COLS");
 	p = cols_p[C_COLS_MANDATORY_I];
-	p+=sizeof(block_header_t);
+	p+=sizeof(struct block_header_st);
 	for (i = 0; i < sizeof(colsMandatory) / sizeof(colsMandatory[0]); i++) {
-		writeInt(colsMandatory[i], p);
-		p+=sizeof(data_t);
-		writeRidPointer(i, p);
-		p+=sizeof(rid_t);
+		if (!writeInt(colsMandatory[i], &p))
+			goto free;
+		if (!writeRidPointer(colsMandatoryRids[i], &p))
+			goto free;
 	}
 	
 	DEBUG("Gravando buffers no arquivo!");
@@ -431,7 +429,7 @@ int createDataDictionary() {
 	
 	// Se chegou aqui, então sucesso!
 	res = TRUE;
-	*/
+
 free:
 	DEBUG("Liberando memória");
 	
@@ -441,6 +439,8 @@ free:
 	for (i = 0; i < sizeof(cols_p) / sizeof(cols_p[0]); i++)
 		freeBuffer(cols_p[i]);
 
+	DEBUG("Sucesso na criação do metadados!");
+
 	return res;
 	
 }
@@ -448,23 +448,28 @@ free:
 // Importante!!! Implementar mecanismo de redução do "size" para o mínimo possível, ou seja,
 // qdo vier um long long int de 64 bits com o valor "100", reduzí-lo para 8 bits (1 byte), pois 
 // é o suficiente para representar esse valor no banco.
-int writeVariableSizeData(generic_pointer_p* dest, generic_pointer_p src, int size) {
+int writeDataSize(generic_pointer_p* dest, generic_pointer_p sizeData, int sizeSize) {
+	int bytesGravados = 0, bytesAGravar = sizeSize;
 	do {
 		struct variable_size_st * var_p = (struct variable_size_st *)(*dest);
-		var_p->more = size > C_MAX_SIZE_PER_DATA_UNIT;
+		var_p->more = sizeSize > 2 ^ sizeof(var_p->size - bytesGravados);
 		if (var_p->more) {
-			var_p->size = C_MAX_SIZE_PER_DATA_UNIT;
-			size-=C_MAX_SIZE_PER_DATA_UNIT;
-		} else {
-			var_p->size = size;
-			size = 0;
+			memcpy(var_p->size, sizeData, 
+			bytesAGravar	
+			sizeSize-=C_MAX_SIZE_PER_DATA_UNIT;
+		} else {mdnsfndmnsfnm
+			var_p->size = sizeSize;
+			sizeSize = 0;
 		}
 		(*dest)+=sizeof(struct variable_size_st);
-		variable_size_data_st * varData_p = (variable_size_data_st *)(*dest);
-		memcpy(varData_p, src, var_p->size);
-		(*dest)+=sizeof(struct variable_size_st);
-		src+=var_p->size;
-	} while (size);
+		//variable_size_data_st * varData_p = (variable_size_data_st *)(*dest);
+		memcpy((*dest), sizeData, var_p->size);
+		(*dest)+=var_p->size;
+		// Incrementa ponteiro da origem (cópia) para pegar o restante do valor
+		sizeData+=var_p->size;
+		// Incrementa bytes gravados
+		bytesGravados += sizeof(var_p->size);
+	} while (bytesAGravar);
 	return TRUE;
 }
 
