@@ -6,12 +6,20 @@
   <data>
     
     
+    
+    
+    
+    
     <item id="org.eclipse.cdt.core.pathentry">
       <pathentry kind="src" path="src"/>
       <pathentry kind="out" path=""/>
       <pathentry kind="con" path="org.eclipse.cdt.managedbuilder.MANAGED_CONTAINER"/>
     </item>
     
+    
+    
+  
+  
   
   </data>
 </cdtproject>
