@@ -29,12 +29,26 @@
 #define C_OBJECTS "OBJS"
 #define C_COLUMNS "COLS"
 #define C_NAME_KEY "NAME"
+#define C_TYPE_KEY "TYPE"
+#define C_TABLE_RID_KEY "TABLE_RID"
+#define C_COLUMN_SID_KEY "COLUMN_SID"
+#define C_LOCATION_KEY "LOCATION"
+#define C_LAST_BLOCK_KEY "LAST_BLOCK"
+#define C_COLUMN_COUNT_KEY "COLUMN_COUNT"
+#define C_RECORD_COUNT_KEY "RECORD_COUNT"
 
-#define C_OBJECTS_COLS_COUNT 5
+#define C_OBJECTS_COLS_COUNT 6
 #define C_COLUMNS_COLS_COUNT 4
 
-#define C_COLUMNS_NAMES {C_NAME_KEY,"TYPE","COLUMN_COUNT","RECORD_COUNT","LAST_BLOCK", "TABLE_RID", "COLUMN_SID", "NAME", "TYPE"};
-#define C_COLUMNS_TYPES {"VARCHAR","VARCHAR","NUMBER","NUMBER","NUMBER","NUMBER","NUMBER","VARCHAR","VARCHAR"};
+#define C_TYPE_VARCHAR "VARCHAR"
+#define C_TYPE_NUMBER "NUMBER"
+#define C_TYPE_DATE "DATE"
+#define C_TYPE_FLOAT "FLOAT"
+
+#define C_OBJECT_TYPE_TABLE "TABLE"
+
+#define C_COLUMNS_NAMES {C_NAME_KEY,C_TYPE_KEY,C_LOCATION_KEY,C_LAST_BLOCK_KEY,C_COLUMN_COUNT_KEY,C_RECORD_COUNT_KEY,C_TABLE_RID_KEY, C_COLUMN_SID_KEY, C_NAME_KEY, C_TYPE_KEY};
+#define C_COLUMNS_TYPES {C_TYPE_VARCHAR,C_TYPE_VARCHAR,C_TYPE_NUMBER,C_TYPE_NUMBER,C_TYPE_NUMBER,C_TYPE_NUMBER,C_TYPE_NUMBER,C_TYPE_NUMBER,C_TYPE_VARCHAR,C_TYPE_VARCHAR};
 
 // ### SUBTIPOS ###
 typedef enum {NUMBER,FLOAT,DATE,VARCHAR,UNKNOWN} DataTypes;
@@ -100,11 +114,11 @@ typedef struct {
 typedef struct {
 	char *            name;
 	BlockOffset       block;
-	//GenericPointer    buffer;
 	StringTreeRoot  * colsList; // <ColumnCursorType>
 } ObjectCursorType;
 
 typedef struct {
+	 ColumnCursorType * column;
 	 BigNumber 		allocSize;
 	 GenericPointer content;
 } DataCursorType;
@@ -120,7 +134,9 @@ typedef struct {
 	StringTreeRoot *   filter; 
 	BigNumber		   rowCount;
 	BlockCursorType	*  block;
+	GenericPointer	   nextBlockOffset;
 	BlockOffset  	   nextBlock;
+	GenericPointer	   blockRegCountOffset;
 	BigNumber		   blockRegCount;
 	GenericPointer	   offset;
 	int				   hasMore;
@@ -143,21 +159,23 @@ int createDataDictionary();
 
 // Controle
 int createTables();
-int newTable(char*, PairListRoot*);
-int createTableStructure(char*, PairListRoot*, BlockOffset*);
-int openBlock(BlockOffset, BlockCursorType *);
+int newTable(char*, StringTreeRoot*);
+int createTableStructure(char*, StringTreeRoot*, BlockOffset*);
+BlockCursorType * openBlock(BlockOffset);
 int closeBlock(BlockCursorType *);
-int openTable(char *, ObjectCursorType **);
+ObjectCursorType * openTable(char *);
 int closeTable(ObjectCursorType *);
-//RidCursorType * findRidInfo(BlockOffset, BigNumber);
-int insertRawData(BlockOffset, PairListRoot*, BigNumber*);
-//int insertRawColumn(BlockOffset, GenericPointer, DataTypes, BlockOffset, BlockPointerType *);
+RidCursorType * insertData(ObjectCursorType*, StringTreeRoot*);
 int findRidFromColumn(ObjectCursorType*, char *, void *, RidCursorType*);
-int openCursor(ObjectCursorType *, StringTreeRoot *, CursorType *);
+CursorType * openCursor(ObjectCursorType *, StringTreeRoot *);
+int closeCursor(CursorType *);
 int fetch(CursorType *);
+StringTreeRoot * createObjectData(char*, char*, BlockOffset, BlockOffset, BigNumber, BigNumber);
+StringTreeRoot * createColumnData(BigNumber, BigNumber, char*, char*);	
 
 // Util	
 DataTypes dataType(char *);
+char * cloneString(char *);
 	
 // Buffer
 GenericPointer blankBuffer();
@@ -188,7 +206,4 @@ int writeInt(int, GenericPointer*);
 int writeNumber(BigNumber, GenericPointer*);
 int writeString(char *, GenericPointer*);
 int writeBlockPointer(BlockOffset, BlockOffset, GenericPointer*);
-
-// Find
-//BigNumber * findData(BlockOffset, GenericPointer, BigNumber, DataTypes);
-//BigNumber * findString(BlockOffset, char *);
+int writeRid(CursorType *, RidCursorType *);
