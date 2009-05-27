@@ -60,33 +60,8 @@ int main(int argc, char** argv)
 		}
 	}*/
 	
-	/*
-	// TESTE DE ÁRVORE
-	StringTreeRoot * root = stNew(FALSE, FALSE);
-	stPut(root, "Marcos", NULL);
-	stPut(root, "Armero", NULL);
-	stPut(root, "Danilo", NULL);
-	stPut(root, "Maurício", NULL);
-	stPut(root, "Fabinho Capixaba", NULL);
-	stPut(root, "Pierre", NULL);
-	stPut(root, "Sandro Silva", NULL);
-	stPut(root, "Diego Souza", NULL);
-	stPut(root, "Marquinhos", NULL);
-	stPut(root, "Keirrison", NULL);
-	stPut(root, "Williams", NULL);
-	
-	// TESTE DA ITERAÇÃO
-	StringTreeNode* iNode;
-	StringTreeIterator* iterator = stCreateIterator(root, &iNode);
-	while (iNode) {
-		printf("%s - %s\n", stNodeName(iNode), (char*) stNodeValue(iNode));
-		iNode = stNext(iterator);
-	}
-	stFreeIterator(iterator);
-	
-	stFree(root);
-	*/
-	
+	// Executa testes programados
+	//tests();
 	
 	// Se o arquivo não existir
 	if (!openDatabase()) {
@@ -127,10 +102,12 @@ int openDatabase() {
 	}
 	
 	// Verifica se os cursores do metadados estão carregados na memória
-	DEBUG("Abrindo tabelas do metadados!"); 
-	if (!openTable(C_OBJECTS, &objs))
+	DEBUG("Abrindo tabelas do metadados!");
+	objs = openTable(C_OBJECTS);  
+	if (!objs)
 		return FALSE;
-	if (!openTable(C_COLUMNS, &cols))
+	cols = openTable(C_COLUMNS); 
+	if (!cols)
 		return FALSE;
 	
 	return TRUE;
@@ -157,10 +134,10 @@ int createTables() {
 	int ret = FALSE;
 	
 	// Teste de criação de objetos
-	PairListRoot * pair = plNew();
-	plAdd(pair, "CODIGO", "NUMBER");
-	plAdd(pair, "DESCRICAO", "VARCHAR");
-	if (!newTable("TESTE", pair)) {
+	StringTreeRoot* columns = stNew(FALSE, FALSE);
+	stPut(columns, "CODIGO", C_TYPE_NUMBER);
+	stPut(columns, "DESCRICAO", C_TYPE_VARCHAR);
+	if (!newTable("TESTE", columns)) {
 		perror("Impossível criar tabela, tabela já exite!");
 		goto free;
 	}
@@ -168,7 +145,7 @@ int createTables() {
 	ret = TRUE;
 		
 free:
-	plFree(pair);
+	stFree(columns);
 	DEBUG("Tabela criada!");
 
 	return ret;
@@ -182,8 +159,8 @@ int readBlock(BlockOffset block, GenericPointer buffer) {
 }
 
 
-int openBlock(BlockOffset block, BlockCursorType * cursor) {
-	int ret = FALSE;
+BlockCursorType * openBlock(BlockOffset block) {
+	BlockCursorType * cursor = NULL;
 
 	GenericPointer buffer = blankBuffer(); 
 	if (!readBlock(block, buffer)) {
@@ -191,246 +168,25 @@ int openBlock(BlockOffset block, BlockCursorType * cursor) {
 		goto free;
 	}
 	
+	cursor = malloc(sizeof(BlockCursorType)); 
 	cursor->block = block;
 	cursor->buffer = buffer;
 	
-	ret = TRUE;
 	buffer = NULL;
 	
 free:
 	freeBuffer(buffer);
 	
-	return ret;
+	return cursor;
 }
 
 int closeBlock(BlockCursorType * cursor) {
-	cursor->block = 0;
+	if (!cursor)
+		return TRUE;
 	freeBuffer(cursor->buffer);
-	cursor->buffer = NULL;
+	free(cursor);
 	return TRUE;
 }
-
-/*
-RidCursorType * findRidInfo(BlockOffset block, BigNumber rid) {
-	RidCursorType * ridCursor = NULL;
-	
-	GenericPointer buffer = blankBuffer();
-	
-	GenericPointer p = buffer;
-	
-	BlockHeaderType * header = (BlockHeaderType *)p;
-	if (!header->valid) {
-		perror("Bloco inválido para leitura do rid!");
-		goto free;
-	} 
-	if (header->type != C_BLOCK_TYPE_MAIN_TAB) {
-		perror("Bloco de tipo incorreto para leitura do rid!");
-		goto free;
-	}
-	p+=sizeof(BlockHeaderType);
-
-	// Lê o offset do próximo bloco
-	BigNumber nextBlock;
-	if (!readSizedNumber(&p, &nextBlock))
-		goto free;
-		
-	BigNumber colCount;
-	if (!readSizedNumber(&p, &colCount))
-		goto free;
-	
-	// Ignora os ponteiros das raizes das colunas
-	if (!skipAllData(&p, colCount))
-		goto free;
-		
-	// Lê a quantidade de registros no bloco
-	BigNumber regCount;
-	if (!readSizedNumber(&p, &regCount))
-		goto free;
-		
-	// Lê a quantidade de colunas, no caso da tabela OBJS (bloco 0), sempre haverá 1 a mais, que é a localização
-	// da tabela
-	int dataCount = colCount * 2; // BlockId & Offset
-	if (!block)
-		dataCount++;
-	BigNumber * data = NULL;
-		
-	// Inicia a varredura
-	while (regCount) {
-		BigNumber ridData;
-		if (!readSizedNumber(&p, &ridData))
-			goto free;
-		int comparision = ridData - rid;
-		
-		// Se achou...
-		if (!comparision) {
-			int i;
-			data = malloc(dataCount * sizeof(BigNumber*));
-			for (i = 0; i < dataCount; i++) 
-				if (!readSizedNumber(&p, &data[i]))
-					goto free; 
-			
-			ridCursor = malloc(sizeof(RidCursorType));
-			ridCursor->rid = rid;
-			ridCursor->dataCount = dataCount;
-			ridCursor->data = data;
-			
-			break;
-		}
-		
-		// Se o rid lido é maior que o solicitado, termina a busca
-		if (comparision > 0)
-			break;
-			
-		if (!skipAllData(&p, dataCount))
-			goto free;
-	}OBJECTS
-		
-free:
-	if ((!ridCursor) && (data))
-		free(data); 
-
-	freeBuffer(buffer);
-	
-	return ridCursor;
-}
-*/
-
-/*BigNumber * findString(BlockOffset block, char * str) {
-	return findData(block, (GenericPointer)str, strlen(str), VARCHAR);	
-}
-
-// Return de RID os the data
-BigNumber * findData(BlockOffset block, GenericPointer findData, BigNumber findDataSize, DataTypes findDataType) {
-	BigNumber * ret = NULL;
-	
-	DEBUG("Buscando dado na tabela!");
-	
-	GenericPointer buf = blankBuffer();
-	if (!readBlock(block, buf)) {
-		perror("Erro ao ler o bloco da coluna de nomes das tabelas!");
-		goto free;
-	}
-	
-	GenericPointer p = buf;
-
-	// Pula o cabeçalho
-	BlockHeaderType * header = (BlockHeaderType *) p;
-	// Verifica se o primeiro bit está ativo, se não estive, está vazio
-	if (!header->valid) {
-		perror("Bloco de da coluna é inválido!");
-		goto free;
-	}
-	if (!((header->type == C_BLOCK_TYPE_INDEX_ROOT) ||
-	      (header->type == C_BLOCK_TYPE_INDEX_LEAF))) {
-		perror("Tipo de bloco da coluna é inválido!");
-		goto free;
-	}
-	p+=sizeof(BlockHeaderType);
-	
-	// Variável para obter o tamanho das variáveis
-	BigNumber dataSize;
-	
-	// Lê a quantidade de registros do bloco
-	BigNumber regsQty;
-	if (!readSizedNumber(&p, &regsQty)) {
-		perror("Erro ao ler a quantidade de registros!");
-		goto free;
-	}
-	
-	if (!regsQty) {
-		DEBUG("Nenhum registro neste bloco!");
-		goto free;
-	}
-
-	// Campos para comparação
-	BigNumber allocSize;
-	GenericPointer genericData = NULL;
-	switch (findDataType) {
-		//case NUMBER:
-		//	allocSize = sizeof(BigNumber); 
-		//	break;
-		case VARCHAR:
-			// Tamanho máximo permitido até o momento
-			allocSize = 128;
-			break;
-		default: // TODO (Pendência): Implementar comparação de todos os tipos de dados
-			perror("Tipo de campo ainda não implementado!");
-			goto free;
-	}
-	genericData = malloc(allocSize);  
-	OBJECTS
-	for (; regsQty > 0; regsQty--) {
-		// Obtém tamanho do dado
-		if (!readDataSize(&p, &dataSize)) {
-			perror("Erro ao ler o tamanho do dado (2)!");
-			goto free;
-		}
-		if (!dataSize) {
-			DEBUG("Busca: Bloco nulo. Cancelando...");
-			goto next_record;
-		}
-		
-		if (dataSize > allocSize) {
-			if (findDataType != VARCHAR) {
-				perror("Erro devido a alocação inexata de memória");
-				goto free;
-			}
-			
-			DEBUG("Alocação insuficiente de memória para VARCHAR - Redimensionando");
-			free(genericData);
-			allocSize = dataSize;
-			genericData = malloc(allocSize);
-		}
-		
-		int comparision;
-		switch (findDataType) {
-			//case NUMBER:
-				// Leitura
-				//readNumber(&p, (BigNumber*)genericData, sizeof(genericData));
-				// Comparação
-				//comparision = (BigNumber*)genericData - cmpNumber;
-				//break;
-			case VARCHAR:
-				// Leitura
-				readData(&p, genericData, dataSize, sizeof(genericData), VARCHAR);
-				// Comparação
-				comparision = memcmp(findData, genericData, MIN(dataSize, findDataSize));
-				break;
-			default:
-				perror("Comparação não preparada para o tipo!");
-				goto free;
-		}
-		
-	next_record:		
-		// Rid do registro
-		if (!readDataSize(&p, &dataSize)) {
-			perror("Erro ao ler o tamanho do dado (3)!");
-			goto free;
-		}
-		// Se não achou, continua
-		if (comparision) {
-			p+=dataSize;
-			continue;
-		}
-			
-		ret = malloc(sizeof(BigNumber));
-		if (!readNumber(&p, ret, dataSize)) {
-			perror("Erro durante a leitura do RID!");
-			ret = NULL;
-			goto free;
-		}
-		break;
-
-	};
-	
-free:
-	freeBuffer(buf);
-	
-	if (genericData)
-		free(genericData);
-	
-	return ret;
-}*/
 
 int initialize() {
 
@@ -465,8 +221,8 @@ int bufferize() {
 	// Bufferizando blocos vazios de dados
 	freeBlocks = llNew();
 	GenericPointer buf = blankBuffer();
-	rewind(pDb); // Posiciona no início do arquivo
-	long int offset = 0;
+	long int offset = C_COLUMNS_BLOCK + 1; // Posiciona no primeiro bloco que não é de controle
+	fseek(pDb, BI2BO(offset), SEEK_SET); 
 	while (fread(buf, C_BLOCK_SIZE, 1, pDb)) {
 		BlockHeaderType * header = (BlockHeaderType *) buf;
 		// Verifica se o primeiro bit está ativo, se não estive, está vazio
@@ -476,23 +232,6 @@ int bufferize() {
 		offset++;
 	}
 	lockedBlocks = llNew();
-	
-	/* ### TESTE DA RANGE LINKED LIST ###
-	llPush(freeBuffers, 1);
-	llPush(freeBuffers, 7002);
-	llPush(freeBuffers, 7000);
-	llPush(freeBuffers, 6999);
-	llPush(freeBuffers, 7001);
-	llPush(freeBuffers, 3000);
-	llPush(freeBuffers, 4097);
-	//llPush(freeBuffers, 2);
-	llPush(freeBuffers, 4096);
-	llDump(freeBuffers);
-	long int v;
-	llPop(freeBuffers, &v);
-	printf("%li\n", v);
-	llPop(freeBuffers, &v);
-	printf("%li\n", v);*/
 	
 	// Lista blocos livres
 	llDump(freeBlocks);
@@ -542,103 +281,32 @@ void freeBuffer(GenericPointer buf) {
 	}
 }
 
-/*int insertRawColumn(BlockOffset mainBlock, GenericPointer data, DataTypes dataType, BlockOffset rid, BlockPointerType * location) {
-	int ret = FALSE;
-	
-	// Abre o bloco principal
-	BlockCursorType cursor;
-	if (openBlock(mainBlock, &cursor)) {
-
-		// Validações	
-		if (!cursor.header->valid) {
-			perror("Bloco inválido!");
-			goto close;
-		}
-		if (cursor.header->type != C_BLOCK_TYPE_INDEX_ROOT) {
-			perror("Bloco de tipo inválido!");
-			goto close;
-		}
-	
-		// Pula o cabeçalho
-		GenericPointer p = cursor.buffer;
-		p+=sizeof(BlockHeaderType);
-		
-		// Lê a quantidade de registros
-		BigNumber regCount;
-		if (!readSizedNumber(&p, &regCount))
-			goto close;
-	
-		// Varre para localizar um local livre
-		int i;
-		for (i = 0; i < regCount; i++) {
-			// Pula dado
-			if (!skipAllData(&p, 1 + // Dado
-							1  // RID
-							))
-				goto close;
-		}
-		
-		// Grava o registro
-		if (!writeAnyData(&p, data, dataType))
-			goto close;
-		
-		
-		// Grava o bloco no arquivo
-		if (!writeOnBlock(cursor.buffer, cursor.block))
-			goto close;
-		
-		/// Retorna o local e o offset
-		location->id = cursor.block;
-		location->offset = regCount;
-		
-		ret = TRUE;
-		
-	} else {
-		perror("Erro ao abrir o bloco!");
-		goto free;
-	}		
-	
-close:
-	closeBlock(&cursor);
-	
-free:
-
-	return ret;
-}*/
-	
 int createDataDictionary() {
-	
 	int ret = FALSE;
-	
-	BlockCursorType *objsBlock = NULL, *colsBlock = NULL;
+	CursorType * objsCursor = NULL;
+	CursorType * colsCursor = NULL;
 	
 	// ### OBJS ###
 	
 	// Cria objeto
-	objsBlock = malloc(sizeof(BlockCursorType));
-	objsBlock->block = C_OBJECTS_BLOCK;
-	objsBlock->buffer = blankBuffer();
-
-	// Criando estrutura da tabela	
-	if (!createStructure(C_BLOCK_TYPE_MAIN_TAB, objsBlock->buffer))
-		goto free;
+	BlockOffset block;
+	if (!createTableStructure(C_OBJECTS, NULL, &block))
+		goto freeCreateDataDictionary; 
 	
 	// ### COLS ###
 	
 	// Cria objeto
-	colsBlock = malloc(sizeof(BlockCursorType));
-	colsBlock->block = C_COLUMNS_BLOCK;
-	colsBlock->buffer = blankBuffer();
-
-	// Criando estrutura da tabela	
-	if (!createStructure(C_BLOCK_TYPE_MAIN_TAB, colsBlock->buffer))
-		goto free;
+	if (!createTableStructure(C_COLUMNS, NULL, &block))
+		goto freeCreateDataDictionary; 
 	
-
 	// ### OBJS:DATA ###
 	
+	objsCursor = openCursor(objs, NULL);
+	if (!objsCursor)
+		goto freeCreateDataDictionary;
+
 	// Pula o cabeçalho
-	GenericPointer p = objsBlock->buffer;
+	GenericPointer p = objsCursor->block->buffer;
 	p+=sizeof(BlockHeaderType);
 	
 	int i;
@@ -648,94 +316,79 @@ int createDataDictionary() {
 	int recordCounts[] = {2, 9};
 	
 	// Ponteiro do próximo bloco (Se é ele mesmo, não há pq preencher)
-	if (!writeNumber(0, &p))
-		goto free;
+	if (!skipData(&p))
+		goto freeCreateDataDictionary;
 
 	// Grava a quantidade de registros no bloco
 	if (!writeNumber(sizeof(objsRids) / sizeof(objsRids[0]), &p))
-		goto free;
+		goto freeCreateDataDictionary;
 
 	// Grava registros:
 	for (i = 0; i < sizeof(objsRids) / sizeof(objsRids[0]); i++) {
-		int colId = 1;
-		// Grava RID
-		if (!writeNumber(objsRids[i], &p) ||
-		// Grava quantidade de campos gravados
-			!writeDataSize(&p, colCounts[0]) ||
-		// Grava coluna NAME
-			!writeDataSize(&p, colId++) || // Sid da coluna
-			!writeString(objsNames[i], &p) || // Dado da coluna
-		// Grava coluna TYPE
-			!writeDataSize(&p, colId++) || // Sid da coluna
-			!writeString("TABLE", &p) || // Dado da coluna
-		// Grava coluna COLUMN_COUNT
-			!writeDataSize(&p, colId++) || // Sid da coluna
-			!writeNumber(colCounts[i], &p) || // Dado da coluna
-		// Grava coluna RECORD_COUNT
-			!writeDataSize(&p, colId++) || // Sid da coluna
-			!writeNumber(recordCounts[i], &p) || // Dado da coluna
-		// Grava coluna LAST_BLOCK
-			!writeDataSize(&p, colId++) || // Sid da coluna
-			!writeNumber(objsBlock->block, &p)) // Dado da coluna
-			goto free;
+		RidCursorType rid;
+		rid.rid = objsRids[i];
+		rid.dataList = createObjectData(objsNames[i], C_OBJECT_TYPE_TABLE, objsCursor->block->block, objsCursor->block->block, colCounts[i], recordCounts[i]);
+		if (!rid.dataList) 
+			goto freeCreateDataDictionary;
+		if (!writeRid(objsCursor, &rid)) {
+			stFree(rid.dataList);
+			goto freeCreateDataDictionary;
+		}
+		stFree(rid.dataList);
 	}
 	
 	
 	// ### COLS:DATA ###
 	
+	colsCursor = openCursor(cols, NULL);
+	if (!colsCursor)
+		goto freeCreateDataDictionary;
+	
 	// Pula o cabeçalho
-	p = colsBlock->buffer;
+	p = colsCursor->block->buffer;
 	p+=sizeof(BlockHeaderType);
 	
 	int colsRids = 1;
-	int colsTabIds[] = {objsRids[0], objsRids[0], objsRids[0], objsRids[0], objsRids[0], objsRids[1], objsRids[1], objsRids[1], objsRids[1]};
-	int colsIds[] = {1, 2, 3, 4, 5, 1, 2, 3, 4};
-	char * colsNames[] = {C_NAME_KEY,"TYPE","COLUMN_COUNT","RECORD_COUNT","LAST_BLOCK","TABLE_RID","COLUMN_SID",C_NAME_KEY,"TYPE"};
-	char * colsTypes[] = {"VARCHAR","VARCHAR","NUMBER","NUMBER","NUMBER","NUMBER","NUMBER","VARCHAR","VARCHAR"};
+	int colsTabIds[] = {objsRids[0], objsRids[0], objsRids[0], objsRids[0], objsRids[0], objsRids[0], objsRids[1], objsRids[1], objsRids[1], objsRids[1]};
+	int colsIds[] = {1, 2, 3, 4, 5, 6, 1, 2, 3, 4};
+	char * colsNames[] = C_COLUMNS_NAMES;
+	char * colsTypes[] = C_COLUMNS_TYPES;
 	
 	// Ponteiro do próximo bloco (Se é ele mesmo, não há pq preencher)
-	if (!writeNumber(0, &p))
-		goto free;
+	if (!skipData(&p))
+		goto freeCreateDataDictionary;
 
 	// Grava a quantidade de registros no bloco
 	if (!writeNumber(sizeof(colsTabIds) / sizeof(colsTabIds[0]), &p))
-		goto free;
+		goto freeCreateDataDictionary;
 
 	// Grava registros:
 	for (i = 0; i < sizeof(colsTabIds) / sizeof(colsTabIds[0]); i++) {
-		int colId = 1;
-		// Grava RID
-		if (!writeNumber(colsRids++, &p) ||
-		// Grava quantidade de campos gravados
-			!writeDataSize(&p, colCounts[1]) ||
-		// Grava coluna TABLE_RID
-			!writeDataSize(&p, colId++) || // Sid da coluna
-			!writeNumber(colsTabIds[i], &p) || // Dado da coluna
-		// Grava coluna COLUMN_SID
-			!writeDataSize(&p, colId++) || // Sid da coluna
-			!writeNumber(colsIds[i], &p) || // Dado da coluna
-		// Grava coluna NAME
-			!writeDataSize(&p, colId++) || // Sid da coluna
-			!writeString(colsNames[i], &p) || // Dado da coluna
-		// Grava coluna TYPE
-			!writeDataSize(&p, colId++) || // Sid da coluna
-			!writeString(colsTypes[i], &p)) // Dado da coluna
-			goto free;
+		RidCursorType rid;
+		rid.rid = colsRids++;
+		rid.dataList = createColumnData(colsTabIds[i], colsIds[i], colsNames[i], colsTypes[i]);
+		if (!rid.dataList) 
+			goto freeCreateDataDictionary;
+		if (!writeRid(colsCursor, &rid)) {
+			stFree(rid.dataList);
+			goto freeCreateDataDictionary;
+		}
+		stFree(rid.dataList);
 	}
-	
+
 	// Efetiva gravação dos blocos
-	if (!writeBlock(objsBlock))
-		goto free;
-	if (!writeBlock(colsBlock)) {
+	if (!writeBlock(objsCursor->block))
+		goto freeCreateDataDictionary;
+	if (!writeBlock(colsCursor->block)) {
 		// TODO (Pendência): Aqui deve ser limpado o cursor anterior pois já gravou
-		goto free;
+		goto freeCreateDataDictionary;
 	}
 
 	ret = TRUE;
 	
-free:
-	closeBlock(objsBlock);
-	closeBlock(colsBlock);
+freeCreateDataDictionary:
+	closeCursor(objsCursor);
+	closeCursor(colsCursor);	
 
 	return ret;
 
@@ -745,150 +398,24 @@ int writeBlock(BlockCursorType* cursor) {
 	return writeOnBlock(cursor->buffer, cursor->block);
 }
 
-/*int insertRawData(BlockOffset block, PairListRoot * list, BigNumber * rid) {
-	int ret = FALSE;
-	
-	// Abre o bloco principal
-	BlockCursorType cursor;
-	if (openBlock(mainBlock, &cursor)) {
-
-		// Validações	
-		if (!cursor.header->valid) {
-			perror("Bloco inválido!");
-			goto close;
-		}
-		if (cursor.header->type == C_BLOCK_TYPE_MAIN_TAB) {
-			perror("Bloco de tipo inválido!");
-			goto close;
-		}
-		
-		// Pula as partes não importantes
-		GenericPointer p = cursor.buffer;
-		p+=sizeof(BlockHeaderType);
-		
-		// Ponteiro do próximo bloco
-		BigNumber nextBlock;
-		if (!readSizedNumber(&p, &nextBlock))
-			goto close;
-	
-		// Obtém a quantidade de colunas do bloco
-		BigNumber colCount;
-		if (!readSizedNumber(&p, &colCount))
-			goto close;
-		
-		// Obtém a quantidade de colunas fixas do bloco
-		BigNumber fixedColCount;
-		if (!readSizedNumber(&p, &fixedColCount))
-			goto close;
-		
-		// Obtém os endereços das colunas
-		int i;
-		BlockOffset colBlocks[colCount];																								
-		for (i = 0; i < colCount; i++) 
-			if (!readSizedNumber(&p, &colBlocks[i]))
-				goto close;
-				
-		// Obtém a quantidade de registros no bloco
-		GenericPointer regCount_p = p;
-		BigNumber regCount;
-		if (!readSizedNumber(&p, &regCount))
-			goto close;
-	
-		// Obtém o número do último RID
-		GenericPointer lastRid_p = p;
-		BigNumber lastRid;
-		if (!readDataSize(&p, &lastRid))
-			goto close;
-
-		// Busca espaço livre no bloco (pula rids)
-		for (i = regCount; i; i--)
-			skipAllData(&p, 1 + //RID 
-							plCount(list) //COLS (fixed + normal)
-							);
-		
-		// Incrementa RID e contador de registros
-		lastRid++;
-		regCount++;
-
-		// Grava as colunas fixas
-		for (i = 0; i < fixedColCount; i++) {
-			ListValueType a, b;
-			if (!plGet(list, i, &a, &b))
-				goto close;
-			// Verifica o tipo do campo
-			if (!writeAnyData(&p, a, dataType(b))) {
-				perror("Erro durante a gravação do dado fixo!");
-				goto close;
-			}
-		}
-		
-		// Preenchimento das colunas normais... :P
-		for (i = fixedColCount; i < plCount(list); i++) {
-			ListValueType a, b;
-			if (!plGet(list, i, &a, &b))
-				goto close;
-			// Verifica o tipo do campo
-			if (!writeAnyData(&p, a, dataType(b))) {
-				perror("Erro durante a gravação do dado fixo!");
-				goto close;
-			}
-			// Insere dado detalhe
-			BlockPointerType location;
-			//if (!insertRawColumn(colBlocks[i - fixedColCount], a, dataType(b), lastRid, &location))
-			//	goto close;
-			// Grava o dado local
-			if (!writeNumber(location.id, &p))
-				goto close;
-			if (!writeNumber(location.offset, &p))
-				goto close;			
-		}
-		
-		// Grava RID incrementado
-		if (!writeNumber(lastRid, &lastRid_p))
-			goto close;
-		
-		// Grava contador de registros incrementado		
-		if (!writeNumber(regCount, &regCount_p))
-			goto close;
-			
-		// Grava o bloco
-		if (!writeOnBlock(cursor.buffer, cursor.block))
-			goto close;
-		
-		ret = TRUE;		
-		
-	} else {
-		perror("Erro ao abrir o bloco!");
-		goto free;
-	}		
-	
-close:
-	closeBlock(&cursor);
-	
-free:
-
-	return ret;
-
-}*/
-
 DataTypes dataType(char * src) {
-	if (!strcmp(src, "VARCHAR"))
+	if (!strcmp(src, C_TYPE_VARCHAR))
 		return VARCHAR;
-	if (!strcmp(src, "NUMBER"))
+	if (!strcmp(src, C_TYPE_NUMBER))
 		return NUMBER;
-	if (!strcmp(src, "DATE"))
+	if (!strcmp(src, C_TYPE_DATE))
 		return DATE;
-	if (!strcmp(src, "FLOAT"))
+	if (!strcmp(src, C_TYPE_FLOAT))
 		return FLOAT;
 	perror("Tipo de dado não identificado!");
 	return UNKNOWN;
 }
 
-int newTable(char* name, PairListRoot* columns) {
+int newTable(char* name, StringTreeRoot* columns) {
 	
 	// Verifica se a tabela existe
-    ObjectCursorType * cursor;
-	if (openTable(name, &cursor)) {
+    ObjectCursorType * cursor = openTable(name); 
+	if (cursor) {
 		closeTable(cursor);
 		return FALSE;
 	}
@@ -1025,9 +552,7 @@ int lockFreeBlock(BlockOffset* pos) {
 	int ret = llPop(freeBlocks, pos);
 	if (ret) {
 		ret = llPush(lockedBlocks, (*pos));
-		if (ret) {
-			(*pos) *= C_BLOCK_SIZE; // Converter para o offset (em bytes) no arquivo
-		} else {
+		if (!ret) {
 			llPush(freeBlocks, (*pos));
 		}
 	}
@@ -1057,13 +582,16 @@ GenericPointer blankBuffer() {
 
 // TODO (Pendência): Todo este processo de busca das tabelas e colunas deve ser bufferizado para melhorar o desempenho
 //   e evitar acesso a disco desnecessariamente!
-int openTable(char * tableName, ObjectCursorType ** tableCursor) {
-	int ret = FALSE;
+ObjectCursorType * openTable(char * tableName) {
+	// Auxiliares
 	int i;
+	int ret = FALSE;
+	
+	CursorType * objsCursor = NULL;
+	CursorType * colsCursor = NULL;
 	
 	// Começa a inicializar o cursor
-	(*tableCursor) = malloc(sizeof(ObjectCursorType));
-	ObjectCursorType * cursor = (*tableCursor);
+	ObjectCursorType * cursor = malloc(sizeof(ObjectCursorType));
 	cursor->name = tableName;
 
 	// Se está tentando abrir a tabela de objetos, a inicialização deve eser manual pois não há donde obter sua definição
@@ -1071,7 +599,7 @@ int openTable(char * tableName, ObjectCursorType ** tableCursor) {
 		cursor->block = C_OBJECTS_BLOCK;
 		cursor->colsList = stNew(FALSE, TRUE);
 		if (!cursor->colsList)
-			goto free;
+			goto freeOpenTable;
 		char * cols[] = C_COLUMNS_NAMES;
 		char * types[] = C_COLUMNS_TYPES;
 		for (i = 0; i < C_OBJECTS_COLS_COUNT; i++) {
@@ -1080,10 +608,10 @@ int openTable(char * tableName, ObjectCursorType ** tableCursor) {
 			column->name = cols[i];
 			column->type = dataType(types[i]);
 			if (!stPut(cursor->colsList, column->name, column))
-				goto free;
+				goto freeOpenTable;
 		}
 		ret = TRUE;
-		goto free;
+		goto freeOpenTable;
 	}
 	
 	// Se está tentando abrir a tabela de colunas, a inicialização deve eser manual pois não há donde obter sua definição
@@ -1091,7 +619,7 @@ int openTable(char * tableName, ObjectCursorType ** tableCursor) {
 		cursor->block = C_COLUMNS_BLOCK;
 		cursor->colsList = stNew(FALSE, TRUE);
 		if (!cursor->colsList)
-			goto free;
+			goto freeOpenTable;
 		char * cols[] = C_COLUMNS_NAMES;
 		char * types[] = C_COLUMNS_TYPES;
 		for (i = 0; i < C_COLUMNS_COLS_COUNT; i++) {
@@ -1100,198 +628,83 @@ int openTable(char * tableName, ObjectCursorType ** tableCursor) {
 			column->name = cols[i+C_OBJECTS_COLS_COUNT];
 			column->type = dataType(types[i+C_OBJECTS_COLS_COUNT]);
 			if (!stPut(cursor->colsList, column->name, column))
-				goto free;
+				goto freeOpenTable;
 		}
 		ret = TRUE;
-		goto free;
+		goto freeOpenTable;
 	}
 	
 	if (!objs || !cols) {
 		perror("Objetos básicos do metadados não foram inicializados!");
-		goto free;
+		goto freeOpenTable;
 	} 
 	
 	// Senão, deve obter através das tabelas do dicionário de dados
-	CursorType objsCursor;
 	StringTreeRoot * tree = stNew(FALSE, FALSE);
 	stPut(tree, C_NAME_KEY, tableName);
-	if (!openCursor(objs, tree, &objsCursor)) {
-		perror("Impossível abrir cursor!");
-		goto free;
+	objsCursor = openCursor(objs, tree);
+	if (!objsCursor) {
+		perror("Impossível abrir cursor dos objetos!");
+		goto freeOpenTable;
 	}
 
 	// Procura a tabela	
-	if (!fetch(&objsCursor)) {
+	if (!fetch(objsCursor)) {
 		perror("Tabela não encontrada!"); 
-		goto free;
+		goto freeOpenTable;
 	}
 	
-	
-
-	// AQUI!!!
-	
-	
-	BlockCursorType objsBlock;
-	if (!openBlock(C_OBJECTS_BLOCK, &objsBlock))
-		goto free;
-	cursor->block = objsBlock.block;
-	// AQUI!!! TIRAR???
-	//cursor->buffer = objsBlock.buffer;
+	// Obtém as colunas da tablea
+	tree = stNew(FALSE, FALSE);
+	stPut(tree, C_TABLE_RID_KEY, &objsCursor->fetch->rid);
+	colsCursor = openCursor(cols, tree);
+	if (!colsCursor) {
+		perror("Impossível abrir cursor das colunas!");
+		goto freeOpenTable;
+	}
+	// Varre as colunas da tabela	
 	cursor->colsList = stNew(FALSE, TRUE);
 	if (!cursor->colsList)
-		goto free;
-	char * cols[] = C_COLUMNS_NAMES;
-	char * types[] = C_COLUMNS_TYPES;
-	for (i = 0; i < C_OBJECTS_COLS_COUNT; i++) {
+		goto freeOpenTable;
+	while (fetch(colsCursor)) {
+		TreeNodeValue value;
+
 		ColumnCursorType * column = malloc(sizeof(ColumnCursorType));
-		column->id = i+1;
-		column->name = cols[i];
-		column->type = dataType(types[i]);
-		if (!stPut(cursor->colsList, column->name, column))
-			goto free;
+
+		if (!stGet(colsCursor->fetch->dataList, C_COLUMN_SID_KEY, &value))
+			goto freeOpenTable;
+		column->id = (* (BigNumber*) value );
+		
+		if (!stGet(colsCursor->fetch->dataList, C_NAME_KEY, &value))
+			goto freeOpenTable;
+		column->name = (char*) value; 
+		
+		if (!stGet(colsCursor->fetch->dataList, C_TYPE_KEY, &value))
+			goto freeOpenTable;
+		column->type = dataType( (char*) value );
+		
+		if (!stPut(cursor->colsList, column->name, column)) 
+			goto freeOpenTable;
+		
 	}
+
 	ret = TRUE;
-	goto free;
 	
-	// Senão, deve obter através das tabelas do dicionário de dados
-	//RidCursorType colsRid;
-	//if (!findRidFromColumn(cols, C_NAME_KEY, C_OBJECTS, &objsRid))
-		//goto free;
-	
-	
-	ret = TRUE;
-	
-	//AQUI!!!
-	
-	 
-	 
-	/*
-	// Preenchimento dos dados
-	GenericPointer p = buf;
-	
-	// Pula o cabeçalho
-	p+=sizeof(BlockHeaderType);
-	
-	// Pula o ponteiro para o bloco
-	if (!skipData(&p)) {
-		perror("Erro ao ler o ponteiro do proximo bloco!");
-		goto free;
-	}
-
-	// Lê a quantidade de colunas do bloco
-	BigNumber colsQty;
-	if (!readSizedNumber(&p, &colsQty)) {
-		perror("Erro durante a leitura da quantidade de colunas do registro!");
-		goto free;
-	} 
-	if (colsQty != 1) {
-		perror("Quantidade de colunas para a tabelas TABS é inválido!");
-		goto free;
-	}
-
-	// Lê a localização do bloco da raiz da única coluna da tabelas TABS: name.
-	// Le o tamanho do ponteiro
-	BlockOffset blockId;
-	if (!readSizedNumber(&p, &blockId)) {
-		perror("Erro ao ler a localização da coluna name da tabela TABS!");
-		goto free;
+freeOpenTable:
+	closeCursor(objsCursor);
+	closeCursor(colsCursor);
+	if (!ret) {
+		if (cursor)
+			closeTable(cursor);
+		cursor = NULL;
 	}
 	
-	// Não há necessidade na leitura do restante
-	
-	DEBUG("Efetuando a busca do nome da tabela!");
-	// Agora deve ser veita a busca do dado no block (conforme indexação)
-	
-	BigNumber * rid = findString(blockId, tableName);
-	
-	if (!rid) // Tabela não localizada
-		goto free;
-	
-	// Se achou, obtém o bloco da tabela
-	ridCursor = findRidInfo(C_TABLES_BLOCK, (*rid));
-	if (!ridCursor) {
-		perror("Impossível localizar o RID!");
-		goto free;
-	}
-	// 3: TableLoc, ColLoc, ColOffset
-	if (ridCursor->dataCount != 3) {
-		perror("Quantidade de dados associados ao RID da tabelas OBJS é inválido!");
-		goto free;
-	}
-
-	// TODO (Pendência): Se encontrou, blz... aqui que as colunas deveriam ter bufferização parcial para o fetch
-
-	BigNumber tableBlock = ridCursor->data[0];
-	tableBuffer = blankBuffer();
-	// Lê o bloco da tabela para pegar inicializar dados das colunas
-	if (!readBlock(tableBlock, tableBuffer)) {
-		perror("Impossível ler bloco da tabela solicitada!");
-		goto free;
-	}
-	 
-	p = tableBuffer;
-	// Pula o cabeçalho
-	p+=sizeof(BlockHeaderType);
-	// Pula o ponteiro para o bloco
-	if (!skipData(&p)) {
-		perror("Erro ao ler o tamanho do dado (1)!");
-		goto free;
-	}
-	// Lê a quantidade de colunas do bloco
-	if (!readSizedNumber(&p, &colsQty)) {
-		perror("Erro durante a leitura da quantidade de colunas do registro da tabela solicitada!");
-		goto free;
-	} 
-	
-	object = malloc(sizeof(ObjectCursorType));
-	object->name = malloc(strlen(tableName) + 1);
-	strcpy(object->name, tableName);
-	object->rootBlock = tableBlock;
-	object->rootBuffer = tableBuffer;
-	tableBuffer = NULL; // Para não sair da memória
-	object->colCount = colsQty;
-	object->cols = NULL; // Não precisa alocar esta informação neste momento
-	*/
-	
-free:
-    /*freeBuffer(tableBuffer);
-	freeBuffer(buf);
-	
-	if (ridCursor) {
-		for (; ridCursor->dataCount; ridCursor->dataCount--)
-			free(&ridCursor->data[ridCursor->dataCount - 1]);
-		free(ridCursor);
-	}
-	*/
-	if (!ret)
-		free(cursor);
-	
-	// TODO (Pendência): Implementar abertura da tabela (Inicialização dos ponteiros e adição em lista)
-	return ret;
+	return cursor;
 }
 
 // Aqui está acessando direto o disco - Ajustar para obter da memória 
 int fetch(CursorType * cursor) {
 	int ret = FALSE;
-	
-	// Neste caso deve ser localizado o block e o primeiro registro do filtro
-	if ((!cursor->fetch) && (cursor->hasMore)) {
-		cursor->block = (BlockCursorType*) malloc(sizeof(BlockCursorType));
-		if (!openBlock(cursor->table->block, cursor->block))
-			goto freeFetch;
-		
-		// Pula o cabeçalho
-		cursor->offset = cursor->block->buffer;
-		cursor->offset+=sizeof(BlockHeaderType);
-		
-		// Ponteiro do próximo bloco
-		if (!readSizedNumber(&cursor->offset, &cursor->nextBlock))
-			goto freeFetch;
-	
-		// LẼ a quantidade de registros no bloco
-		if (!readSizedNumber(&cursor->offset, &cursor->blockRegCount))
-			goto freeFetch;
-	}
 	
 	if (!cursor->hasMore) {
 		perror("Não há mais dados");
@@ -1306,8 +719,10 @@ int fetch(CursorType * cursor) {
 		validFetch = TRUE; // True pois se não houver filtro, o primeiro registro é válido
 		
 		// Processo de comparação por todos os campos do filtro
-		StringTreeNode* iNode;
-		StringTreeIterator* iter = stCreateIterator(cursor->filter, &iNode);
+		StringTreeNode* iNode = NULL;
+		StringTreeIterator* iter;
+		if (cursor->filter)
+			iter = stCreateIterator(cursor->filter, &iNode);
 		while (iNode) {
 			// Obtenção de informações
 			TreeNodeValue value;
@@ -1447,56 +862,111 @@ freeReadRid:
 	
 }
 
-int openCursor(ObjectCursorType * object, StringTreeRoot * filter, CursorType * cursor) {
+CursorType * openCursor(ObjectCursorType * object, StringTreeRoot * filter) {
+	int ret = FALSE;
+	
+	CursorType * cursor = malloc(sizeof(CursorType));
 	cursor->fetch = NULL;
 	cursor->table = object;
 	cursor->filter = filter;
 	cursor->rowCount = 0;
-	cursor->block = NULL;
 	cursor->hasMore = TRUE;
-	return TRUE;	
+	cursor->block = NULL;
+
+	cursor->block = openBlock(cursor->table->block);
+	if (!cursor->block)
+		goto freeOpenCursor;
+	
+	// Pula o cabeçalho
+	cursor->offset = cursor->block->buffer;
+	cursor->offset+=sizeof(BlockHeaderType);
+	
+	// Ponteiro do próximo bloco
+	cursor->nextBlockOffset = cursor->offset;
+	if (!readSizedNumber(&cursor->offset, &cursor->nextBlock))
+		goto freeOpenCursor;
+
+	// Lê a quantidade de registros no bloco
+	cursor->blockRegCountOffset = cursor->offset;
+	if (!readSizedNumber(&cursor->offset, &cursor->blockRegCount))
+		goto freeOpenCursor;
+		
+	ret = TRUE;
+
+freeOpenCursor:
+	if (!ret) {
+		closeBlock(cursor->block);
+		free(cursor);
+		cursor = NULL;
+	}
+
+	return cursor;	
+}
+
+int closeCursor(CursorType * cursor) {
+	if (!cursor)
+		return TRUE;
+	if (cursor->fetch) {
+		if (cursor->fetch->dataList)
+			stFree(cursor->fetch->dataList);
+		free(cursor->fetch);
+	}
+	/* A tabela não pode ser fechada pois o controle é outro
+	if (cursor->table)
+		closeTable(cursor->table);
+	*/
+	if (cursor->filter)
+		stFree(cursor->filter);
+	if (cursor->block) 
+		closeBlock(cursor->block);
+	free(cursor);
+	return TRUE;
 }
 
 int closeTable(ObjectCursorType * object) {
 	// TODO (Pendência): Implementar fechamento da tabela (Finalização dos ponteiros, remoção da lista e limpeza de memória)
+	if (!object)
+		return TRUE;
 
 	// Fecha os buffers do cursors e o limpa da memória (junto com as colunas se houverem)
-	StringTreeNode* iNode;
-	StringTreeIterator* iterator = stCreateIterator(object->colsList, &iNode);
-	while (iNode) {
-		ColumnCursorType * column = (ColumnCursorType *) stNodeValue(iNode); 
-		
-		free(column->name);
-		//freeBuffer(column->buffer);
-		free(column);
-		
-		iNode = stNext(iterator);
+	if (object->colsList) {
+		StringTreeNode* iNode;
+		StringTreeIterator* iterator = stCreateIterator(object->colsList, &iNode);
+		while (iNode) {
+			ColumnCursorType * column = (ColumnCursorType *) stNodeValue(iNode); 
+			
+			free(column->name);
+			//freeBuffer(column->buffer);
+			free(column);
+			
+			iNode = stNext(iterator);
+		}
+		stFreeIterator(iterator);
 	}
-	stFreeIterator(iterator);
-	
-	free(object->name);
+	//free(object->name);
 	//freeBuffer(object->buffer);
 	free(object);
 
 	return TRUE;
 }
 
-int createTableStructure(char* name, PairListRoot* columns, BlockOffset* block) {
+int createTableStructure(char* name, StringTreeRoot* columns, BlockOffset* block) {
 	int ret = FALSE;
 	
 	BlockCursorType *table = malloc(sizeof(BlockCursorType));
 	
 	int dict = FALSE;
 	if (!strcmp(name, C_OBJECTS)) {
-		table->block = C_OBJECTS_BLOCK;
+		(*block) = C_OBJECTS_BLOCK;
 		dict = TRUE;
 	} else if (!strcmp(name, C_COLUMNS)) {
-		table->block = C_COLUMNS_BLOCK;
+		(*block) = C_COLUMNS_BLOCK;
 		dict = TRUE;
-	} else if (!lockFreeBlock(&table->block)) {
+	} else if (!lockFreeBlock(block)) {
 		perror("Não existem blocos disponíveis para criação da tabela!");
 		goto freeCreateTableStructure;
 	}
+	table->block = (*block);
 	table->buffer = blankBuffer();
 
 	// Criando estrutura da tabela	
@@ -1522,95 +992,253 @@ int createTableStructure(char* name, PairListRoot* columns, BlockOffset* block) 
 			goto freeCreateTableStructure;
 		}
 		
-		insertData(objs, );
-
-		// Insere registro da tabela
-		
-	// Pula o cabeçalho
-	GenericPointer p = objsBlock->buffer;
-	p+=sizeof(BlockHeaderType);
-	
-	int i;
-	int objsRids[] = {1, 2};
-	char * objsNames[] = {C_OBJECTS, C_COLUMNS};
-	int colCounts[] = {C_OBJECTS_COLS_COUNT, C_COLUMNS_COLS_COUNT};
-	int recordCounts[] = {2, 9};
-	
-	// Ponteiro do próximo bloco (Se é ele mesmo, não há pq preencher)
-	if (!writeNumber(0, &p))
-		goto free;
-
-	// Grava a quantidade de registros no bloco
-	if (!writeNumber(sizeof(objsRids) / sizeof(objsRids[0]), &p))
-		goto free;
-
-	// Grava registros:
-	for (i = 0; i < sizeof(objsRids) / sizeof(objsRids[0]); i++) {
-		int colId = 1;
-		// Grava RID
-		if (!writeNumber(objsRids[i], &p) ||
-		// Grava quantidade de campos gravados
-			!writeDataSize(&p, colCounts[0]) ||
-		// Grava coluna NAME
-			!writeDataSize(&p, colId++) || // Sid da coluna
-			!writeString(objsNames[i], &p) || // Dado da coluna
-		// Grava coluna TYPE
-			!writeDataSize(&p, colId++) || // Sid da coluna
-			!writeString("TABLE", &p) || // Dado da coluna
-		// Grava coluna COLUMN_COUNT
-			!writeDataSize(&p, colId++) || // Sid da coluna
-			!writeNumber(colCounts[i], &p) || // Dado da coluna
-		// Grava coluna RECORD_COUNT
-			!writeDataSize(&p, colId++) || // Sid da coluna
-			!writeNumber(recordCounts[i], &p) || // Dado da coluna
-		// Grava coluna LAST_BLOCK
-			!writeDataSize(&p, colId++) || // Sid da coluna
-			!writeNumber(objsBlock->block, &p)) // Dado da coluna
-			goto free;
-	}
-		
-		
-	}
-	
-	
-
-
-	// ### COLUNAS ###
-
-	//AQUI!!!
-
-	/*for (i = 1; i < sizeof(blocks) / sizeof(blocks[0]); i++) {
-		p = buffers[i];
-		p+=sizeof(BlockHeaderType);
-
-		// Grava a quantidade registros no bloco
-		if (!writeNumber(0, &p))
-			goto free;
+		// Prepara dados para inserção na tabela OBJS
+		StringTreeRoot * dataList = createObjectData(name, C_OBJECT_TYPE_TABLE, table->block, table->block, stCount(columns), 0);
+		if (!dataList) 
+			goto freeCreateTableStructure;
+		RidCursorType * rid = insertData(objs, dataList);
+		if (!rid)
+			goto freeCreateTableStructure;
 			
+		// Insere colunas na COLS
+		StringTreeNode * iNode = NULL;
+		StringTreeIterator * iter = stCreateIterator(columns, &iNode);
+		int colId = 1;
+		while (iNode) {			
+			char* colName = (char*) stNodeName(iNode); 
+			char* colType = (char*) stNodeValue(iNode);
+			dataList = createColumnData(rid->rid, colId++, colName, colType);
+			if (!dataList) 
+				goto freeCreateTableStructure;
+			RidCursorType * colRid = insertData(cols, dataList);
+			if (!colRid)
+				goto freeCreateTableStructure;
+			iNode = stNext(iter);
+		}
+		stFreeIterator(iter);
+		 
+	}
+	
+	if (!writeBlock(table))
+		goto freeCreateTableStructure;
+		
+	ret = TRUE;
+	
+freeCreateTableStructure:
+	if (table) {
+		// Desbloqueia blocos travados para gravação da tabela
+		if (!ret && !dict)
+			unlockBlock(table->block);
+		closeBlock(table);
 	}
 
-	// Grava blocos da tabela no arquivo 
-	DEBUG("Gravando buffers no arquivo!");
-	// Gravação dos blocos de dados
-	for (i = 0; i < sizeof(buffers) / sizeof(buffers[0]); i++)
-		writeOnBlock(buffers[i], blocks[i]);
-	
-    // Preeche os blocos de retorno
-    (*tableBlock) = blocks[0];
-    for (i = 1; i < sizeof(blocks) / sizeof(blocks[0]); i++)
-    	colsBlocks[i - 1] = blocks[i];
-    ret = TRUE;
-*/
-freeCreateTableStructure:
-/*
-	// Desbloqueia blocos travados para gravação da tabela
-	if (!ret)
-		for (i = 0; i < sizeof(blocks) / sizeof(blocks[0]); i++)
-			unlockBlock(blocks[i]);
-
-	for (i = 0; i < sizeof(buffers) / sizeof(buffers[0]); i++)
-		freeBuffer(buffers[i]); 
-*/
 	return ret;	
 }
 
+RidCursorType * insertData(ObjectCursorType* obj, StringTreeRoot* data) {
+	RidCursorType * newRid = NULL;
+	CursorType * cursor = NULL;
+	
+	cursor = openCursor(obj, NULL);	
+	if (!cursor)
+		goto freeInsertData;
+		
+	cursor->blockRegCount++;
+	GenericPointer p = cursor->blockRegCountOffset;
+	if (!writeNumber(cursor->blockRegCount, &p))
+		goto freeInsertData;
+	
+	// Vai até o último registro da tabela:: Tem que otimizar para pegar a informação do LAST_BLOCK da tabela
+	RidCursorType * lastRid = NULL;
+	while (fetch(cursor)) {
+		lastRid = cursor->fetch; 
+	}
+	
+	// Se achou o último RID, gera um novo número
+	newRid = malloc(sizeof(RidCursorType));
+	if (lastRid)
+		newRid->rid = lastRid->rid + 1;
+	else
+		newRid->rid = 1;
+	newRid->dataList = data;
+	
+	if (!writeRid(cursor, newRid))	
+		goto freeInsertData;
+		
+	return newRid;
+	
+freeInsertData:
+	closeCursor(cursor);
+	if (newRid)
+		free(newRid);
+		
+	return NULL;
+
+}
+
+int writeRid(CursorType * cursor, RidCursorType * rid) {
+	int ret = FALSE;
+	
+	// Os RIDs devem iniciar de 1
+	if (rid->rid <= 0) {
+		perror("Código RID inválido!");
+		goto freeWriteRid;
+	}
+
+	// Escreve o número do RID
+	if (!writeNumber(rid->rid, &cursor->offset))
+		goto freeWriteRid;
+	
+	// Escreve a quantidade de dados no registro
+	BigNumber fieldCount = 0;
+	if (rid->dataList) 
+		fieldCount = stCount(rid->dataList);
+	if (!writeNumber(fieldCount, &cursor->offset))
+		goto freeWriteRid;
+	
+	// Itera os dados do RID para gravar. Problema: Esta iteração ocorre por ordem alfabética
+	// Obs: É checado o fieldCount pois pd haver casos em que a tabela só tenha registros nulos
+	if (fieldCount) {
+		StringTreeNode * iNode = NULL;
+		StringTreeIterator * iter = stCreateIterator(rid->dataList, &iNode);
+		while (iNode) {
+			DataCursorType * data = (DataCursorType *) stNodeValue(iNode);
+			// Grava o ID da coluna
+			if (!writeDataSize(&cursor->offset, data->column->id))
+				goto freeWriteRid;
+			// Grava o dado
+			if (!writeAnyData(&cursor->offset, data->content, data->column->type))
+				goto freeWriteRid;
+			// Próximo dado
+			iNode = stNext(iter);
+		}
+		stFreeIterator(iter);
+	}
+	ret = TRUE;
+
+freeWriteRid:
+
+	return ret;
+
+}
+
+StringTreeRoot * createObjectData(char* name, char* type, BlockOffset location, BlockOffset lastBlock, BigNumber columnCount, BigNumber registryCount) {
+	TreeNodeValue value;
+
+	StringTreeRoot * dataList = stNew(FALSE, TRUE);
+
+	if (!stGet(objs->colsList, C_NAME_KEY, &value))
+		goto freeCreateObjectData;
+	DataCursorType * data = malloc(sizeof(DataCursorType));
+	data->column = value;
+	data->allocSize = strlen(name);
+	data->content = (GenericPointer) name;
+	if (!stPut(dataList, data->column->name, data))
+		goto freeCreateObjectData;
+
+	if (!stGet(objs->colsList, C_TYPE_KEY, &value))
+		goto freeCreateObjectData;
+	data = malloc(sizeof(DataCursorType));
+	data->column = value;
+	data->content = (GenericPointer) type;
+	data->allocSize = strlen(type);
+	if (!stPut(dataList, data->column->name, data))
+		goto freeCreateObjectData;
+
+	if (!stGet(objs->colsList, C_LOCATION_KEY, &value))
+		goto freeCreateObjectData;
+	data = malloc(sizeof(DataCursorType));
+	data->column = value;
+	data->content = (GenericPointer) &location;
+	data->allocSize = sizeof(location);
+	if (!stPut(dataList, data->column->name, data))
+		goto freeCreateObjectData;
+
+	if (!stGet(objs->colsList, C_LAST_BLOCK_KEY, &value))
+		goto freeCreateObjectData;
+	data = malloc(sizeof(DataCursorType));
+	data->column = value;
+	data->content = (GenericPointer) &lastBlock;
+	data->allocSize = sizeof(lastBlock);
+	if (!stPut(dataList, data->column->name, data))
+		goto freeCreateObjectData;
+	
+	if (!stGet(objs->colsList, C_COLUMN_COUNT_KEY, &value))
+		goto freeCreateObjectData;
+	data = malloc(sizeof(DataCursorType));
+	data->column = value;
+	data->content = (GenericPointer) &columnCount;
+	data->allocSize = sizeof(columnCount);
+	if (!stPut(dataList, data->column->name, data))
+		goto freeCreateObjectData;
+
+	if (!stGet(objs->colsList, C_RECORD_COUNT_KEY, &value))
+		goto freeCreateObjectData;
+	data = malloc(sizeof(DataCursorType));
+	data->column = value;
+	data->content = (GenericPointer) &registryCount;
+	data->allocSize = sizeof(registryCount);
+	if (!stPut(dataList, data->column->name, data))
+		goto freeCreateObjectData;
+
+	return dataList;
+	
+freeCreateObjectData:
+	stFree(dataList);
+
+	return NULL;
+}
+
+StringTreeRoot * createColumnData(BigNumber tableRid, BigNumber columnSid, char* name, char* type) {
+	TreeNodeValue value;
+
+	StringTreeRoot * dataList = stNew(FALSE, TRUE);
+
+	if (!stGet(cols->colsList, C_TABLE_RID_KEY, &value))
+		goto freeCreateColumnData;
+	DataCursorType * data = malloc(sizeof(DataCursorType));
+	data->column = value;
+	data->content = (GenericPointer) &tableRid;
+	data->allocSize = sizeof(tableRid);
+	if (!stPut(dataList, data->column->name, data))
+		goto freeCreateColumnData;
+
+	if (!stGet(cols->colsList, C_COLUMN_SID_KEY, &value))
+		goto freeCreateColumnData;
+	data = malloc(sizeof(DataCursorType));
+	data->column = value;
+	data->content = (GenericPointer) &columnSid;
+	data->allocSize = sizeof(columnSid);
+	if (!stPut(dataList, data->column->name, data))
+		goto freeCreateColumnData;
+
+	if (!stGet(cols->colsList, C_NAME_KEY, &value))
+		goto freeCreateColumnData;
+	data = malloc(sizeof(DataCursorType));
+	data->column = value;
+	data->allocSize = strlen(name);
+	data->content = (GenericPointer) name;
+	if (!stPut(dataList, data->column->name, data))
+		goto freeCreateColumnData;
+
+	if (!stGet(cols->colsList, C_TYPE_KEY, &value))
+		goto freeCreateColumnData;
+	data = malloc(sizeof(DataCursorType));
+	data->column = value;
+	data->content = (GenericPointer) type;
+	data->allocSize = strlen(type);
+	if (!stPut(dataList, data->column->name, data))
+		goto freeCreateColumnData;
+
+	return dataList;
+	
+freeCreateColumnData:
+	stFree(dataList);
+
+	return NULL;
+}
+
+char * cloneString(char * from) {
+	char * to = malloc(sizeof(char) * strlen(from));
+	return strcpy(to, from);
+}

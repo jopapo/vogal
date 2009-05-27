@@ -483,6 +483,8 @@ StringTreeNode ** stFind(StringTreeNode ** node, TreeNodeName name, int * diff) 
 }
 
 int stPut(StringTreeRoot* root, TreeNodeName name, TreeNodeValue value) {
+	if (!name)
+		return FALSE;
 	int diff = 1;
 	StringTreeNode ** node = stFind(&root->root, name, &diff);
 	if (!diff) {
