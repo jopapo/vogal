@@ -7,43 +7,32 @@
  ****************************************************************************/
 
 #include "list.h"
-#include <my_global.h>
 
 // ### RANGE LIST IMPLEMENATION ###
 
 LinkedListRootType* llNew() {
-	DBUG_ENTER("llNew");
-	
 	LinkedListRootType* root = (LinkedListRootType*) malloc(sizeof(LinkedListRootType));
 	root->root = NULL;
-	
-	DBUG_RETURN(root);
+	return root;
 }
 
 int llFreeNode(LinkedListType* node) {
-	DBUG_ENTER("llFreeNode");
-	
 	if (node) {
 		llFreeNode(node->next);
 		free(node);
 	}
-	
-	DBUG_RETURN(true);
+	return TRUE;
 }
 
 int llFree(LinkedListRootType* root) {
-	DBUG_ENTER("llFree");
-	
 	llFreeNode(root->root);
 	free(root);
-	
-	DBUG_RETURN(true);
+	return TRUE;
 }
 
 void llMergeCheck(LinkedListType* previous, LinkedListType* node) {
-	DBUG_ENTER("llMergeCheck");
 	if (!node)
-		DBUG_LEAVE;
+		return;
 	LinkedListType* next = node->next;
 	// Verifica se a sequência tem algo que poderia ser incorporado
 	if ((next) && (node->key - next->key == -1)) {
@@ -62,16 +51,14 @@ void llMergeCheck(LinkedListType* previous, LinkedListType* node) {
 				free(next);
 			}
 		} else {
-			node->link = true;
+			node->link = TRUE;
 		}
 	}
-	DBUG_LEAVE;
 }
 
 int llPush(LinkedListRootType* root, ListDataType key) {
-	DBUG_ENTER("llPush");
 	if (!root) 
-		DBUG_RETURN(false);
+		return FALSE;
 	
 	// 1o caso: Lista vazia
 	if (!root->root) {
@@ -80,7 +67,7 @@ int llPush(LinkedListRootType* root, ListDataType key) {
 		node->key = key;
 		node->link = 0;
 		node->next = NULL;
-		DBUG_RETURN(true);
+		return TRUE;
 	}
 	
 	// 2o caso: Busca do item na lista
@@ -90,50 +77,50 @@ int llPush(LinkedListRootType* root, ListDataType key) {
 		int dif = iterator->key - key;
 		// É igual
 		if (!dif) // dif == 0
-			DBUG_RETURN(true);
+			return TRUE;
 		// Deve estar antes
 		if (dif > 0) {
 			if ((dif == 1) && (iterator->link)) {
 				iterator->key = key;
 				llMergeCheck(previous, iterator);
-				DBUG_RETURN(true);
+				return TRUE;
 			} 
 			LinkedListType* node = (LinkedListType*) malloc (sizeof(LinkedListType));
 			node->key = key;
-			node->link = false;
+			node->link = FALSE;
 			node->next = iterator;
 			if (previous)
 				previous->next = node;
 			else
 				root->root = node;
-			DBUG_RETURN(true);
+			return TRUE;
 		}
 		// Deve estar depois
 		if (dif < 0) {
 			LinkedListType* next = iterator->next;
 			if (iterator->link) {
 				if ((next) && (next->key >= key))
-					DBUG_RETURN(true); // Se estiver na faixa, cai fora
+					return TRUE; // Se estiver na faixa, cai fora
 			} else {
 				// Se for o próximo (1 de diferença)
 				if (dif == -1) {
 					if ((previous) && (previous->link)) {
 						iterator->key = key;
 						llMergeCheck(previous, iterator);
-						DBUG_RETURN(true);
+						return TRUE;
 					}
 				} 
 				if ((!next) || (next->key > key)) {
 					// Se for o próximo (mais de 1 de diferença)
 					LinkedListType* node = (LinkedListType*) malloc (sizeof(LinkedListType));
 					node->key = key;
-					node->link = false;
+					node->link = FALSE;
 					node->next = iterator->next;
 					iterator->next = node;
 					if (dif == -1) 
-						iterator->link = true;
+						iterator->link = TRUE;
 					llMergeCheck(iterator, node);
-					DBUG_RETURN(true);
+					return TRUE;
 				}
 			}
 		}
@@ -141,13 +128,12 @@ int llPush(LinkedListRootType* root, ListDataType key) {
 		previous = iterator;
 		iterator = iterator->next;
 	}
-	DBUG_RETURN(false);
+	return FALSE;
 }
 
 int llPop(LinkedListRootType* root, ListDataType * key) {
-	DBUG_ENTER("llPop");
 	if (!root) 
-		DBUG_RETURN(false);
+		return FALSE;
 	
 	// 2o caso: Busca do item na lista
 	LinkedListType* node = root->root;
@@ -156,7 +142,7 @@ int llPop(LinkedListRootType* root, ListDataType * key) {
 		if (node->link) {
 			node->key += 1;
 			if (node->key < node->next->key)
-				DBUG_RETURN(true);
+				return TRUE;
 		} 
 		root->root = node->next;
 		free(node);
@@ -165,25 +151,22 @@ int llPop(LinkedListRootType* root, ListDataType * key) {
 		root->root = NULL;
 	}
 	
-	DBUG_RETURN(true);
+	return TRUE;
 }
 
 void llRemoveMerge(LinkedListRootType* root, LinkedListType* previous, LinkedListType* node) {
-	DBUG_ENTER("llRemoveMerge");
 	if (previous) {
-		previous->link = false;
+		previous->link = FALSE;
 		previous->next = node->next;
 	} else {
 		root->root = node->next;
 	}
 	free(node);
-	DBUG_LEAVE;
 }
 
 int llRemove(LinkedListRootType* root, ListDataType key) {
-	DBUG_ENTER("llRemove");
 	if (!root) 
-		DBUG_RETURN(false);
+		return FALSE;
 	
 	// 2o caso: Busca do item na lista
 	LinkedListType* previous = NULL;
@@ -197,7 +180,7 @@ int llRemove(LinkedListRootType* root, ListDataType key) {
 				if (node->key == node->next->key) {
 					llRemoveMerge(root, previous, node);
 				}
-				DBUG_RETURN(true);				
+				return TRUE;				
 			} else {
 				if ((previous) && (previous->link)) {
 					node->key--;
@@ -207,7 +190,7 @@ int llRemove(LinkedListRootType* root, ListDataType key) {
 				} else {
 					llRemoveMerge(root, previous, node);
 				}
-				DBUG_RETURN(true);
+				return TRUE;
 			}
 		// No meio de uma faixa
 		} else if ((previous) && 
@@ -217,50 +200,49 @@ int llRemove(LinkedListRootType* root, ListDataType key) {
 					 difn = node->key - key;
 			if (difp == 1 && difn == 1) {
 			// Remove o item 3 tendo uma faixa de 2 a 4
-				previous->link = false;
+				previous->link = FALSE;
 			} else if (difp == 1) {
 			// Remove o item 3 tendo uma faixa 2 a 100
 				LinkedListType* newnode = (LinkedListType*) malloc (sizeof(LinkedListType));
 				newnode->key = key + 1;
-				newnode->link = true;
+				newnode->link = TRUE;
 				newnode->next = node;
-				previous->link = false;
+				previous->link = FALSE;
 				previous->next = newnode;
 			} else if (difn == 1) {
 			// Remove o item 3 tendo uma faixa 1 a 4
 				LinkedListType* newnode = (LinkedListType*) malloc (sizeof(LinkedListType));
 				newnode->key = key - 1;
-				newnode->link = false;
+				newnode->link = FALSE;
 				newnode->next = node;
-				previous->link = true;
+				previous->link = TRUE;
 				previous->next = newnode;
 			} else {
 			// Remove o item 3 tendo uma faixa 1 a 100
 				LinkedListType* newnextnode = (LinkedListType*) malloc (sizeof(LinkedListType));
 				newnextnode->key = key + 1;
-				newnextnode->link = true;
+				newnextnode->link = TRUE;
 				newnextnode->next = node;
 
 				LinkedListType* newnode = (LinkedListType*) malloc (sizeof(LinkedListType));
 				newnode->key = key - 1;
-				newnode->link = false;
+				newnode->link = FALSE;
 				newnode->next = newnextnode;
 				
 				previous->next = newnode;
 			}
-			DBUG_RETURN(true);
+			return TRUE;
 		}
 		previous = node;
 		node = node->next;
 	}
 	
-	DBUG_RETURN(false);
+	return FALSE;
 }
 
 int llDump(LinkedListRootType* root) {
-	DBUG_ENTER("llDump");
 	if (!root)
-		DBUG_RETURN(false);
+		return FALSE;
 	printf("<RangeLinkedList>\n");
 	LinkedListType* iterator = root->root;
 	while (iterator) {
@@ -273,191 +255,236 @@ int llDump(LinkedListRootType* root) {
 		iterator = iterator->next;
 	}
 	printf("</RangeLinkedList>\n");
-	DBUG_RETURN(true);
+	return TRUE;
 }
 
-// ### ValueList ###
+/* ### TREE IMPLEMENTATION ###
+ 
+ 
+int create(treeRootNode_t *root) {
+	root = (treeRootNode_t) malloc(sizeof(treeRootNode_t));
+	root.root = NULL;
+	return 1;
+}
+
+void free_node(treeNode_t **node) {
+	if (node) {
+		free_node(node->leftLeaf);
+		free_node(node->rigthLeaf);
+		free(node);
+	}
+}
+
+void destroy(treeRootNode_t *root) {
+	free_node(root.root);
+}
+
+int add(treeRootNode_t **root, ListDataType key) {
+	treeNode_t *parent = (treeNode_t) malloc(sizeof(treeNode_t));
+	if (find(root, parent))
+		return 0;
+	
+	treeNode_t *node = (treeNode_t) malloc(sizeof(treeNode_t));
+	node.key = key;
+	node.leftLeaf = NULL;
+	node.rightLeaf = NULL;
+	
+	if (parent) {
+		if (key > parent->key) {
+			node->leftLeaf = parent->leftLeaf;
+			parent->leftLeaf = node;
+		} else {
+			node->rightLeaf = parent->rightLeaf;
+			parent->rightLeaf = node;
+		}
+	} else {
+		root.root = node;
+	}
+	
+}
+
+int remove(treeRootNode_t **root, ListDataType key) {
+	treeNode_t*
+		parent = (treeNode_t) malloc(sizeof(treeNode_t)),
+		node = (treeNode_t) malloc(sizeof(treeNode_t));
+	if (find(root, parent, node)) {
+		parent.
+	}
+	return 0;
+}
+
+treeNode_t **find(treeRootNode_t **root, ListDataType value) {
+	treeNote_t *parent = NULL;
+	treeNote_t *node = root.root;
+	if (internal_find(&parent, value, &node))
+		return node;
+	return NULL;
+}
+
+int internal_find(treeNode_t *parent, ListDataType value, treeNode_t *node) {
+	if (node) {
+		if (node.value == value)
+			return 1;
+		if (node.value < value) {
+			if (internal_find(node, node.leftLeaf))
+				return 1;
+			return 0;
+		} 
+		if (node.value > value) {
+			if (internal_find(node, node.rigthLeaf))
+				return 1;
+			return 0;
+		} 
+	}
+	return 0;
+}
+*/
 
 #define C_VL_GROW_FACTOR 10
 
-ValueListRoot* vlNew(bool owner) {
-	DBUG_ENTER("vlNew");
-	ValueListRoot * root = (ValueListRoot *) malloc(sizeof(ValueListRoot));
-	root->root = (ListValueType*) malloc(C_VL_GROW_FACTOR * sizeof(ListValueType*));
+ValueListRoot* vlNew() {
+	ValueListRoot * root = malloc(sizeof(ValueListRoot));
+	root->root = malloc(C_VL_GROW_FACTOR * sizeof(ListValueType*));
 	root->space = C_VL_GROW_FACTOR;
 	root->count = 0;
-	root->owner = owner;
-	DBUG_RETURN(root);
+	return root;
 }
 
 int vlFree(ValueListRoot* root) {
-	DBUG_ENTER("vlFree");
-	if (!root)
-		DBUG_RETURN(true);
-	if (root->owner)
-		for (int i = 0; i < root->count; i++)
-			delete root->root[i];
 	free(root->root);
 	root->root = NULL;
 	root->space = 0;
 	root->count = 0;
 	free(root);
-	DBUG_RETURN(true);
+	return TRUE;
 }
 
 int vlAdd(ValueListRoot* root, ListValueType value) {
-	DBUG_ENTER("vlAdd");
 	// Se é necessário crescer
 	if (root->count >= root->space) {
-		root->root = (ListValueType*) realloc(root->root, sizeof(root->root) + (C_VL_GROW_FACTOR * sizeof(ListValueType*)));
+		root->root = realloc(root->root, sizeof(root->root) + (C_VL_GROW_FACTOR * sizeof(ListValueType*)));
 		root->space += C_VL_GROW_FACTOR;
 	}
 	root->root[root->count] = value;
 	root->count++;
-	DBUG_RETURN(true);
+	return TRUE;
 }
 
 int vlCount(ValueListRoot* root) {
-	DBUG_ENTER("vlCount");
-	DBUG_RETURN(root->count);	
+	return root->count;	
 }
 
 ListValueType * vlGet(ValueListRoot* root, int index) {
-	DBUG_ENTER("vlGet");
 	if ((index < 0) ||
 	    (index >= root->count)) {
 		perror("Fora dos limites da lista!"); 
-		DBUG_RETURN(NULL);
+		return NULL;
 	}
-	DBUG_RETURN( (ListValueType *) root->root[index] );
+	return root->root[index];
 }
 
 int vlPush(ValueListRoot* root,ListValueType value) {
-	DBUG_ENTER("vlPush");
-	DBUG_RETURN(vlAdd(root, value));
+	return vlAdd(root, value);
 }
 
 ListValueType* vlPop(ValueListRoot* root) {
-	DBUG_ENTER("vlPop");
 	int last = vlCount(root) - 1;
 	ListValueType* value = vlGet(root, last);
 	root->count--; // Remove da lista o último elemento
-	DBUG_RETURN(value); 
+	return value; 
 }
 
 // ### PairList ###
 
-PairListRoot* plNew(bool nameOwner, bool valueOwner) {
-	DBUG_ENTER("plNew");
-	PairListRoot * root = (PairListRoot *) malloc(sizeof(PairListRoot));
-	root->a = vlNew(nameOwner);
-	root->b = vlNew(valueOwner);
-	DBUG_RETURN(root); 
+PairListRoot* plNew() {
+	PairListRoot * root = malloc(sizeof(PairListRoot));
+	root->a = vlNew();
+	root->b = vlNew();
+	return root; 
 }
 
 int plFree(PairListRoot* root) {
-	DBUG_ENTER("plFree");
 	if (!root)
-		DBUG_RETURN(true);
+		return TRUE;
 	if (!vlFree(root->a))
-		DBUG_RETURN(false);
+		return FALSE;
 	if (!vlFree(root->b))
-		DBUG_RETURN(false);
+		return FALSE;
 	free(root);
-	DBUG_RETURN(true);
+	return TRUE;
 }
 
 int plAdd(PairListRoot* root, ListValueType a, ListValueType b) {
-	DBUG_ENTER("plAdd");
 	if (!root)
-		DBUG_RETURN(false);
+		return FALSE;
 	if (!vlAdd(root->a, a))
-		DBUG_RETURN(false);
+		return FALSE;
 	if (!vlAdd(root->b, b))
-		DBUG_RETURN(false);
-	DBUG_RETURN(true);
+		return FALSE;
+	return TRUE;
 }
 
 int plCount(PairListRoot* root) {
-	DBUG_ENTER("plCount");
-	DBUG_RETURN( vlCount(root->a) );
+	return vlCount(root->a);
 }
 
 int plGet(PairListRoot* root, int index, ListValueType* a, ListValueType* b) {
-	DBUG_ENTER("plGet");
 	(*a) = vlGet(root->a, index);
 	(*b) = vlGet(root->b, index);
-	DBUG_RETURN(true);
-}
-
-ListValueType * plGetName(PairListRoot* root, int index) {
-	DBUG_ENTER("plGetName");
-	DBUG_RETURN( vlGet(root->a, index) );
-}
-
-ListValueType * plGetValue(PairListRoot* root, int index) {
-	DBUG_ENTER("plGetName");
-	DBUG_RETURN( vlGet(root->b, index) );
+	return TRUE;
 }
 
 
 // ### StringTree ###
-/*
+
 StringTreeRoot* stNew(int nameOwner, int valueOwner) {
-	DBUG_ENTER("stNew");
-	StringTreeRoot * root = (StringTreeRoot*) malloc(sizeof(StringTreeRoot));
+	StringTreeRoot * root = malloc(sizeof(StringTreeRoot));
 	root->count = 0;
 	root->root = NULL;
-	// Owner significa que, se for true, libera a memória ao terminar.
+	// Owner significa que, se for TRUE, libera a memória ao terminar.
 	root->nameOwner = nameOwner;
 	root->valueOwner = valueOwner;
-	DBUG_RETURN(root);
+	return root; 
 }
 
 int stFreeNode(StringTreeRoot* root, StringTreeNode* node) {
-	DBUG_ENTER("stFreeNode");
 	if (node) {
 		if (!stFreeNode(root, node->left))
-			DBUG_RETURN(false);
+			return FALSE;
 		if (!stFreeNode(root, node->rigth))
-			DBUG_RETURN(false);
+			return FALSE;
 		if (root->nameOwner)
 			free(node->name);
 		if (root->valueOwner)
 			free(node->value);
 		free(node);
 	}
-	DBUG_RETURN(true);
+	return TRUE;
 }
 
 int stFree(StringTreeRoot* root) {
-	DBUG_ENTER("stFree");
-	if (!root)
-		DBUG_RETURN(true);
 	if (!stFreeNode(root, root->root))
-		DBUG_RETURN(false);
+		return FALSE;
 	root->root = NULL;
 	root->count = 0;
-	DBUG_RETURN(true);
+	return TRUE;
 }
 
 StringTreeNode ** stFind(StringTreeNode ** node, TreeNodeName name, int * diff) {
-	DBUG_ENTER("stFind");
 	if ( (*node) ) {
 		(*diff) = strcmp((*node)->name, name);
 		if ((*diff)) {
 			if ((*diff) > 0)
-				DBUG_RETURN( stFind(&(*node)->left, name, diff) );
-			DBUG_RETURN( stFind(&(*node)->rigth, name, diff) );
+				return stFind(&(*node)->left, name, diff);
+			return stFind(&(*node)->rigth, name, diff);
 		}
 	}
-	DBUG_RETURN(node);
+	return node;
 }
 
 int stPut(StringTreeRoot* root, TreeNodeName name, TreeNodeValue value) {
-	DBUG_ENTER("stPut");
 	if (!name)
-		DBUG_RETURN(false);
+		return FALSE;
 	int diff = 1;
 	StringTreeNode ** node = stFind(&root->root, name, &diff);
 	if (!diff) {
@@ -465,38 +492,35 @@ int stPut(StringTreeRoot* root, TreeNodeName name, TreeNodeValue value) {
 	} else {
 		if ((*node)) {
 			perror("Erro ao inserir na ramificação da árvore. Varredura incompleta!");
-			DBUG_RETURN(false);
+			return FALSE;
 		}
-		(*node) = (StringTreeNode*) malloc(sizeof(StringTreeNode));
+		(*node) = malloc(sizeof(StringTreeNode));
 		(*node)->name = name;
 		(*node)->value = value;
 		(*node)->left = NULL;
 		(*node)->rigth = NULL;
 		root->count++;
 	}
-	DBUG_RETURN(true);
+	return TRUE;
 }
 
 int stCount(StringTreeRoot* root) {
-	DBUG_ENTER("stCount");
-	DBUG_RETURN(root->count);
+	return root->count;
 }
 
 int stGet(StringTreeRoot* root, TreeNodeName name, TreeNodeValue* value) {
-	DBUG_ENTER("stGet");
 	int diff = 1;
 	StringTreeNode ** node = stFind(&root->root, name, &diff);
 	if (!diff) {
 		(*value) = (*node)->value;
-		DBUG_RETURN(true);
+		return TRUE;
 	}
-	DBUG_RETURN(false);
+	return FALSE;
 }
 
 int stInternalNextPush(StringTreeIterator* iterator, StringTreeNode* node) {
-	DBUG_ENTER("stInternalNextPush");
 	if (!node) 
-		DBUG_RETURN(false);
+		return FALSE;
 	// Empilha todos os lefts...
 	for (; (node) && (node->left); node = node->left)
 		vlPush(iterator->stack, node);
@@ -504,51 +528,43 @@ int stInternalNextPush(StringTreeIterator* iterator, StringTreeNode* node) {
 	if (node)
 		vlPush(iterator->stack, node);
 
-	DBUG_RETURN(true);
+	return TRUE;
 }
 
 StringTreeIterator* stCreateIterator(StringTreeRoot* root, StringTreeNode** first) {
-	DBUG_ENTER("stCreateIterator");
-	StringTreeIterator* iterator = (StringTreeIterator*) malloc(sizeof(StringTreeIterator));
+	StringTreeIterator* iterator = malloc(sizeof(StringTreeIterator));
 	iterator->root = root;
 	iterator->stack = vlNew();
 	stInternalNextPush(iterator, iterator->root->root);
 	(*first) = stNext(iterator);
-	DBUG_RETURN(iterator);
+	return iterator;
 }
 
 int stFreeIterator(StringTreeIterator* iterator) {
-	DBUG_ENTER("stFreeIterator");
-	if (!iterator)
-		DBUG_RETURN(true);
 	vlFree(iterator->stack);
 	free(iterator);
-	DBUG_RETURN(true);
+	return TRUE;
 }
 
 StringTreeNode* stNext(StringTreeIterator* iterator) {
-	DBUG_ENTER("stNext");
 	if (!iterator->stack->count)
-		DBUG_RETURN(NULL);
+		return NULL;
 	StringTreeNode* node = (StringTreeNode*) vlPop(iterator->stack);
 	if (node) {
 		stInternalNextPush(iterator, node->rigth);
-		DBUG_RETURN(node); 
+		return node; 
 	}
-	DBUG_RETURN(NULL);
+	return NULL;
 }
 
 TreeNodeName stNodeName(StringTreeNode* node) {
-	DBUG_ENTER("stNodeName");
 	if (!node)
-		DBUG_RETURN(NULL);
-	DBUG_RETURN(node->name);
+		return NULL;
+	return node->name;
 }
 
 TreeNodeValue stNodeValue(StringTreeNode* node) {
-	DBUG_ENTER("stNodeValue");
 	if (!node)
-		DBUG_RETURN(NULL);
-	DBUG_RETURN(node->value);
+		return NULL;
+	return node->value;
 }
-*/
