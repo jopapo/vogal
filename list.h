@@ -6,11 +6,12 @@
  *  <jopapo@gmail.com>
  ****************************************************************************/
 
+#ifndef VOGAL_LIST
+#define VOGAL_LIST
+
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
-
-#include "bool.h"
 
 // ### LinkedListType ###
 
@@ -42,9 +43,10 @@ typedef struct {
 	ListValueType *root;
 	int space;
 	int count;
+	bool owner;
 } ValueListRoot;
 
-ValueListRoot* vlNew();
+ValueListRoot* vlNew(bool owner);
 int vlFree(ValueListRoot*);
 int vlAdd(ValueListRoot*,ListValueType);
 int vlCount(ValueListRoot*);
@@ -60,14 +62,16 @@ typedef struct {
 	ValueListRoot *b;
 } PairListRoot;
 
-PairListRoot* plNew();
+PairListRoot* plNew(bool, bool);
 int plFree(PairListRoot*);
 int plAdd(PairListRoot*,ListValueType,ListValueType);
 int plCount(PairListRoot*);
 int plGet(PairListRoot*, int, ListValueType*, ListValueType*);
+ListValueType * plGetName(PairListRoot*, int);
+ListValueType * plGetValue(PairListRoot*, int);
 
 
-
+/*
 // ### StringTree ###
 typedef char* TreeNodeName;
 typedef void* TreeNodeValue;
@@ -101,3 +105,6 @@ StringTreeNode* stNext(StringTreeIterator*);
 int stFreeIterator(StringTreeIterator*);
 TreeNodeName stNodeName(StringTreeNode*);
 TreeNodeValue stNodeValue(StringTreeNode*);
+*/
+
+#endif

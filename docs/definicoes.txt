@@ -1,7 +1,0 @@
-Block type: TABLE DEFS
-HEADER|NEXT BLOCK POINTER|COLS QTY|{COLS POINTERS|...}|REGS QTY|{[RID|POINTER]|...}
-
-Block type: INDEX ROOT
-HEARED|REGS QTY|[DATA|RID]
-
-// A definição acima deve ser alterada!

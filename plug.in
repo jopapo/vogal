@@ -1,0 +1,4 @@
+MYSQL_STORAGE_ENGINE(vogal,,  [Vogal Storage Engine],
+        [AEIOU - Armazenamento e Extração de Informações Otimizada por Unicidade], [max,max-no-ndb])
+MYSQL_PLUGIN_DYNAMIC(vogal,   [ha_vogal.la])
+
