@@ -15,9 +15,6 @@ public:
 	vogal_manipulation(vogal_handler *handler);
 	virtual ~vogal_manipulation();
 	
-	RidCursorType * insertData(CursorType* cursor, ValueListRoot* data);
-	int writeRid(CursorType * cursor, RidCursorType * rid);
-	
 	CursorType * openCursor(ObjectCursorType * object, PairListRoot * filter);
 	int fetch(CursorType * cursor);
 	RidCursorType * readRid(CursorType * cursor);
@@ -25,8 +22,11 @@ public:
 
 	RidCursorType * parseRecord(CursorType * cursor, ColumnCursorType * column, BlockCursorType * block, GenericPointer * offset, bool loadData);
 	ValueListRoot * parseBlock(CursorType * cursor, ColumnCursorType * column, BlockCursorType * block, bool loadData);
-	RidCursorType* findNearest(CursorType * cursor, RidCursorType * rid2find, BlockCursorType ** block);
-	int writeOrderedData(CursorType * cursor, BlockCursorType * block, RidCursorType * rid, DataCursorType * data);
+	RidCursorType* findNearest(CursorType * cursor, RidCursorType * rid2find, BlockCursorType * block);
+	
+	RidCursorType * insertData(CursorType* cursor, ValueListRoot* data);
+	int writeData(CursorType * cursor, RidCursorType * rid, DataCursorType * data);
+	int writeRid(CursorType * cursor, RidCursorType * rid);
 
 	ValueListRoot * createObjectData(char* name, char* type, BlockOffset location);
 	ValueListRoot * createColumnData(BigNumber tableRid, char* name, char* type, BlockOffset location);
