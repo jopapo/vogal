@@ -1,0 +1,21 @@
+
+#include "BlockCursorType.h"
+#include "vogal_cache.h"
+
+BlockCursorType::BlockCursorType() {
+	DBUG_ENTER("BlockCursorType::BlockCursorType");
+	
+	id = 0;
+	buffer = NULL;
+	
+	DBUG_LEAVE;
+}
+
+BlockCursorType::~BlockCursorType() {
+	DBUG_ENTER("BlockCursorType::~BlockCursorType");
+	
+	vogal_cache::freeBuffer(buffer);
+	buffer = NULL;
+	
+	DBUG_LEAVE;
+}
