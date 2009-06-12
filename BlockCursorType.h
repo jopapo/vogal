@@ -15,6 +15,9 @@ public:
 		GenericPointer   buffer;
 		BlockHeaderType *header; // Apenas um ponteiro dentro do buffer
 	};
+	GenericPointer offset;
+	ValueListRoot *ridsList; // <RidCursorType>
+	ValueListRoot *offsetsList; // <BlockOffset>
 	
 };
 

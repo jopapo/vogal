@@ -305,14 +305,36 @@ int vlFree(ValueListRoot* root) {
 	DBUG_RETURN(true);
 }
 
-int vlAdd(ValueListRoot* root, ListValueType value) {
-	DBUG_ENTER("vlAdd");
+int vlGrow(ValueListRoot* root) {
+	DBUG_ENTER("vlGrow");
 	// Se é necessário crescer
 	if (root->count >= root->space) {
 		root->root = (ListValueType*) realloc(root->root, sizeof(root->root) + (C_VL_GROW_FACTOR * sizeof(ListValueType*)));
 		root->space += C_VL_GROW_FACTOR;
 	}
+	DBUG_RETURN(true);	
+}
+
+int vlAdd(ValueListRoot* root, ListValueType value) {
+	DBUG_ENTER("vlAdd");
+	if (!vlGrow(root))
+		DBUG_RETURN(false);
 	root->root[root->count] = value;
+	root->count++;
+	DBUG_RETURN(true);
+}
+
+int vlInsert(ValueListRoot* root, ListValueType value, int index) {
+	DBUG_ENTER("vlInsert");
+	if (index < 0) {
+		perror("Index inválido!");
+		DBUG_RETURN(false);
+	}
+	if (!vlGrow(root))
+		DBUG_RETURN(false);
+	for (int i = root->count - 1; i > index; i--)
+		root->root[i] = root->root[i-1];
+	root->root[index] = value;
 	root->count++;
 	DBUG_RETURN(true);
 }

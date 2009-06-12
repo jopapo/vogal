@@ -6,6 +6,7 @@ class vogal_manipulation; // Interrelacionamento com a vogal_handler
 
 #include "vogal_utils.h"
 #include "CursorType.h"
+#include "SearchInfoType.h"
 #include "vogal_handler.h"
 
 class vogal_manipulation
@@ -21,12 +22,14 @@ public:
 	BigNumber nextRid(CursorType * cursor);
 
 	RidCursorType * parseRecord(CursorType * cursor, ColumnCursorType * column, BlockCursorType * block, GenericPointer * offset, bool loadData);
-	ValueListRoot * parseBlock(CursorType * cursor, ColumnCursorType * column, BlockCursorType * block, bool loadData);
-	RidCursorType* findNearest(CursorType * cursor, RidCursorType * rid2find, BlockCursorType * block);
+	int parseBlock(CursorType * cursor, ColumnCursorType * column, BlockCursorType * block, bool loadData);
+	SearchInfoType * findNearest(CursorType * cursor, RidCursorType * rid2find, DataCursorType * data2find, BlockCursorType * rootBlock);
+	int updateBlockBuffer(BlockCursorType * block);
 	
 	RidCursorType * insertData(CursorType* cursor, ValueListRoot* data);
 	int writeData(CursorType * cursor, RidCursorType * rid, DataCursorType * data);
 	int writeRid(CursorType * cursor, RidCursorType * rid);
+	int writeDataCursor(GenericPointer* dest, DataCursorType * data);
 
 	ValueListRoot * createObjectData(char* name, char* type, BlockOffset location);
 	ValueListRoot * createColumnData(BigNumber tableRid, char* name, char* type, BlockOffset location);

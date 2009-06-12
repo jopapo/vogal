@@ -185,6 +185,12 @@ CursorType * vogal_definition::createTableStructure(char *name, PairListRoot *co
 	}
 	cursor->table->block->buffer = vogal_cache::blankBuffer();
 
+	// Atualiza estrutura
+	if (!m_Handler->getManipulation()->updateBlockBuffer(cursor->table->block)) {
+		perror("Erro ao atualizar estrutura da tabla!");
+		goto freeCreateTableStructure;
+	}
+
 	// Monta estrutura da tabela
 	if (!createStructure(C_BLOCK_TYPE_MAIN_TAB, cursor->table->block->buffer)) {
 		perror("Erro ao criar estrutura da tabela!");
@@ -216,6 +222,11 @@ CursorType * vogal_definition::createTableStructure(char *name, PairListRoot *co
 			perror("Erro ao criar estrutura da coluna!");
 			goto freeCreateTableStructure;
 		}
+		if (!m_Handler->getManipulation()->updateBlockBuffer(col->block)) {
+			perror("Erro ao atualizar estrutura da coluna!");
+			goto freeCreateTableStructure;
+		}
+		// Adiciona à lista de colunas
 		vlAdd(cursor->table->colsList, col);
 	}
 
