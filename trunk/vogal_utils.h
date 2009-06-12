@@ -54,12 +54,6 @@ typedef struct {
 	unsigned char 	   :4; // 4 bits sobram
 } BlockHeaderType;
 
-typedef struct {
-	BlockOffset id;
-	BlockOffset offset;
-} DataLocationType;
-
-
 // Declaração da classe
 class vogal_utils
 {

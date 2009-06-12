@@ -15,7 +15,8 @@ public:
 	BigNumber 		  allocSize;
 	BigNumber 		  usedSize;
 	GenericPointer    content;
-	DataLocationType *location;
+	BlockOffset 	  blockId;
+	BlockOffset 	  blockOffset;
 	
 };
 

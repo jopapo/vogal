@@ -49,7 +49,9 @@ typedef struct {
 ValueListRoot* vlNew(bool owner);
 int vlFree(ValueListRoot*);
 int vlAdd(ValueListRoot*,ListValueType);
+int vlInsert(ValueListRoot*,ListValueType,int);
 int vlCount(ValueListRoot*);
+int vlGrow(ValueListRoot*);
 ListValueType* vlGet(ValueListRoot*, int);
 // Simulação de pilha
 int vlPush(ValueListRoot*,ListValueType);
