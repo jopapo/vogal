@@ -5,8 +5,6 @@ vogal_cache::vogal_cache(vogal_handler * handler){
 	DBUG_ENTER("vogal_cache::vogal_cache");
 	
 	m_Handler = handler;
-	m_Objects = NULL;
-	m_Columns = NULL;
 	m_FreeBlocks = llNew();
 	m_LockedBlocks = llNew();
 
@@ -21,24 +19,16 @@ vogal_cache::~vogal_cache(){
 	llFree(m_LockedBlocks);
 	m_LockedBlocks = NULL;
 
-	// Fechando tabelas
-	if (m_Objects) {
-		m_Objects->~ObjectCursorType();
-		m_Objects = NULL;
-	}
-	if (m_Columns) {
-		m_Columns->~ObjectCursorType();
-		m_Columns = NULL;
-	}
-
 	DBUG_LEAVE;
 }
 
 GenericPointer vogal_cache::blankBuffer(){
 	DBUG_ENTER("vogal_cache::blankBuffer");
 	
-	GenericPointer buf = (GenericPointer) malloc(C_BLOCK_SIZE);
-	memset(buf, 0x00, C_BLOCK_SIZE);
+	GenericPointer buf = new unsigned char[C_BLOCK_SIZE];
+	//(GenericPointer) malloc(C_BLOCK_SIZE);
+	// Não precisaria mas é interessante para visibilidade do código binário gravado no arquivão
+	memset(buf, 0x00, C_BLOCK_SIZE); 
 	
 	DBUG_RETURN(buf);
 }
@@ -97,25 +87,13 @@ int vogal_cache::unlockBlock(BlockOffset block) {
 	DBUG_RETURN(true);
 }
 
-ObjectCursorType *vogal_cache::getObjects() {
-	DBUG_ENTER("vogal_cache::getObjects");
-	DBUG_RETURN(m_Objects);
+// TODO: Melhorar mecanismo de cache dos objetos do metadados!
+ObjectCursorType *vogal_cache::openObjects() {
+	DBUG_ENTER("vogal_cache::openObjects");
+	DBUG_RETURN( m_Handler->getDefinition()->openTable(C_OBJECTS) );
 }
 
-ObjectCursorType *vogal_cache::getColumns() {
-	DBUG_ENTER("vogal_cache::getColumns");
-	DBUG_RETURN(m_Columns);
-}
-
-int vogal_cache::openDataDictionary() {
-	DBUG_ENTER("vogal_cache::openDataDictionary");
-	
-	m_Objects = m_Handler->getDefinition()->openTable(C_OBJECTS);  
-	if (!m_Objects)
-		DBUG_RETURN(false);
-	m_Columns = m_Handler->getDefinition()->openTable(C_COLUMNS); 
-	if (!m_Columns)
-		DBUG_RETURN(false);
-		
-	DBUG_RETURN(true);
+ObjectCursorType *vogal_cache::openColumns() {
+	DBUG_ENTER("vogal_cache::openColumns");
+	DBUG_RETURN( m_Handler->getDefinition()->openTable(C_COLUMNS) );
 }

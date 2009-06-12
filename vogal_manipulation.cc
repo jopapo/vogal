@@ -14,28 +14,32 @@ vogal_manipulation::~vogal_manipulation(){
 	DBUG_LEAVE;
 }
 
-ColumnCursorType * vogal_manipulation::findColumn(ObjectCursorType* table, char * colName) {
+ColumnCursorType * vogal_manipulation::findColumn(CursorType* cursor, char * colName) {
 	DBUG_ENTER("vogal_manipulation::findColumn");
-	if (!table) {
+	if (!cursor) {
+		perror("Impossível obter uma coluna de nenhum cursor!");
+		DBUG_RETURN(NULL);
+	}
+	if (!cursor->table) {
 		perror("Impossível obter uma coluna de nenhuma tabela!");
 		DBUG_RETURN(NULL);
 	}
-	for (int i = 0; i < vlCount(table->colsList); i++) {
-		ColumnCursorType * col = (ColumnCursorType *) vlGet(table->colsList, i);
+	for (int i = 0; i < vlCount(cursor->table->colsList); i++) {
+		ColumnCursorType * col = (ColumnCursorType *) vlGet(cursor->table->colsList, i);
 		if (!strcmp(col->name, colName))
 			DBUG_RETURN(col);
 	}
 	DBUG_RETURN(NULL);
 }
 
-ValueListRoot * vogal_manipulation::createObjectData(char* name, char* type, BlockOffset location) {
+ValueListRoot * vogal_manipulation::createObjectData(CursorType * cursor, char* name, char* type, BlockOffset location) {
 	DBUG_ENTER("vogal_manipulation::createObjectData");
 	
 	DataCursorType *data = NULL;
 	ValueListRoot *dataList = vlNew(true);
 
 	data = new DataCursorType();
-	data->column = findColumn(m_Handler->getCache()->getObjects(), C_NAME_KEY);
+	data->column = findColumn(cursor, C_NAME_KEY);
 	if (!data->column)
 		goto freeCreateObjectData;
 	data->allocSize = strlen(name);
@@ -44,7 +48,7 @@ ValueListRoot * vogal_manipulation::createObjectData(char* name, char* type, Blo
 		goto freeCreateObjectData;
 
 	data = new DataCursorType();
-	data->column = findColumn(m_Handler->getCache()->getObjects(), C_TYPE_KEY);
+	data->column = findColumn(cursor, C_TYPE_KEY);
 	if (!data->column)
 		goto freeCreateObjectData;
 	data->content = (GenericPointer) type;
@@ -53,7 +57,7 @@ ValueListRoot * vogal_manipulation::createObjectData(char* name, char* type, Blo
 		goto freeCreateObjectData;
 
 	data = new DataCursorType();
-	data->column = findColumn(m_Handler->getCache()->getObjects(), C_LOCATION_KEY);
+	data->column = findColumn(cursor, C_LOCATION_KEY);
 	if (!data->column)
 		goto freeCreateObjectData;
 	data->content = (GenericPointer) &location;
@@ -71,14 +75,14 @@ freeCreateObjectData:
 	DBUG_RETURN(NULL);
 }
 
-ValueListRoot * vogal_manipulation::createColumnData(BigNumber tableRid, char* name, char* type, BlockOffset location) {
+ValueListRoot * vogal_manipulation::createColumnData(CursorType * cursor, BigNumber tableRid, char* name, char* type, BlockOffset location) {
 	DBUG_ENTER("vogal_manipulation::createColumnData");
 	
 	DataCursorType * data = NULL;
 	ValueListRoot * dataList = vlNew(true);
 
 	data = new DataCursorType();
-	data->column = findColumn(m_Handler->getCache()->getColumns(), C_TABLE_RID_KEY);
+	data->column = findColumn(cursor, C_TABLE_RID_KEY);
 	if (!data->column)
 		goto freeCreateColumnData;
 	data->content = (GenericPointer) &tableRid;
@@ -87,7 +91,7 @@ ValueListRoot * vogal_manipulation::createColumnData(BigNumber tableRid, char* n
 		goto freeCreateColumnData;
 
 	data = new DataCursorType();
-	data->column = findColumn(m_Handler->getCache()->getColumns(), C_NAME_KEY);
+	data->column = findColumn(cursor, C_NAME_KEY);
 	if (!data->column)
 		goto freeCreateColumnData;
 	data->allocSize = strlen(name);
@@ -96,7 +100,7 @@ ValueListRoot * vogal_manipulation::createColumnData(BigNumber tableRid, char* n
 		goto freeCreateColumnData;
 
 	data = new DataCursorType();
-	data->column = findColumn(m_Handler->getCache()->getColumns(), C_TYPE_KEY);
+	data->column = findColumn(cursor, C_TYPE_KEY);
 	if (!data->column)
 		goto freeCreateColumnData;
 	data->content = (GenericPointer) type;
@@ -105,7 +109,7 @@ ValueListRoot * vogal_manipulation::createColumnData(BigNumber tableRid, char* n
 		goto freeCreateColumnData;
 
 	data = new DataCursorType();
-	data->column = findColumn(m_Handler->getCache()->getColumns(), C_LOCATION_KEY);
+	data->column = findColumn(cursor, C_LOCATION_KEY);
 	if (!data->column)
 		goto freeCreateColumnData;
 	data->content = (GenericPointer) &location;
@@ -413,26 +417,35 @@ SearchInfoType * vogal_manipulation::findNearest(CursorType * cursor, RidCursorT
 	info->rootBlock = rootBlock;
 	info->blocksList = vlNew(true);
 	info->findedBlock = rootBlock;
-	
-	if (info->findedBlock->header->type == C_BLOCK_TYPE_MAIN_TAB) {
-		if (!rid2find) {
-			perror("Nenhum rid para localização!");
-			goto freeFindNearest;
-		}
-	} else {
-		if (!data2find) {
-			perror("Nenhum dado para localização!");
-			goto freeFindNearest;
-		}
-	}
+	int count;
 
 	while (true) {
 		if (!info->findedBlock) {
-			perror("Erro ao ler bloco!");
+			perror("Por qual bloco começar?!");
 			goto freeFindNearest;
+		}
+		if (!info->findedBlock->buffer) {
+			perror("Bloco não bufferizado para efetuar o parse!");
+			goto freeFindNearest;
+		}
+		if (info->findedBlock->header->type == C_BLOCK_TYPE_MAIN_TAB) {
+			if (!rid2find) {
+				perror("Nenhum rid para localização!");
+				goto freeFindNearest;
+			}
+		} else {
+			if (!data2find) {
+				perror("Nenhum dado para localização!");
+				goto freeFindNearest;
+			}
 		}
 		if (!parseBlock(cursor, data2find?data2find->column:NULL, info->findedBlock, false)) {
 			perror("Erro ao obter os registros sem complementos do block!");
+			goto freeFindNearest;
+		}
+		count = vlCount(info->findedBlock->ridsList);
+		if (count <= 0) {
+			DBUG_PRINT("INFO", ("Bloco vazio!"));
 			goto freeFindNearest;
 		}
 
@@ -470,7 +483,7 @@ SearchInfoType * vogal_manipulation::findNearest(CursorType * cursor, RidCursorT
 						continue;
 					}
 					info->offset = i;
-					goto freeFindNearest;
+					break;
 				}
 			}
 		}
@@ -578,12 +591,20 @@ int vogal_manipulation::writeData(CursorType * cursor, RidCursorType * rid, Data
 	RidCursorType *newRid = NULL;
 
 	// Inicialização das variáveis
-	info = findNearest(cursor, rid, data, data->column->block);
+	if (data) {
+		block = data->column->block;
+		neededSpace =
+			m_Handler->getStorage()->bytesNeeded(data->usedSize) + // Dado chave
+			m_Handler->getStorage()->bytesNeeded(sizeof(rid->id)) + // RID
+			m_Handler->getStorage()->bytesNeeded(sizeof(BlockOffset)); // Ponteiro bloco esquerda
+	} else {
+		block = cursor->table->block;
+		neededSpace =
+			m_Handler->getStorage()->bytesNeeded(data->usedSize); // RID
+		// + Deslocamentos!!!
+	}
 
-	neededSpace =
-		m_Handler->getStorage()->bytesNeeded(data->usedSize) + // Dado chave
-		m_Handler->getStorage()->bytesNeeded(sizeof(rid->id)) + // RID
-		m_Handler->getStorage()->bytesNeeded(sizeof(BlockOffset)); // Ponteiro bloco esquerda
+	info = findNearest(cursor, rid, data, block);
 
 	//for (int i = vlCount(info->blockList) -1; i >= 0; i--) {
 		//block = vlGet(info->blockList, 0);
