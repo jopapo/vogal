@@ -22,6 +22,7 @@ vogal_cache::~vogal_cache(){
 	DBUG_LEAVE;
 }
 
+// Otimizar para trabalhar na HEAP com um certo tamanho pré-alocado
 GenericPointer vogal_cache::blankBuffer(){
 	DBUG_ENTER("vogal_cache::blankBuffer");
 	
@@ -46,6 +47,7 @@ int vogal_cache::bufferize(){
 			llPush(m_FreeBlocks, offset);
 		}
 	}
+	freeBuffer(buf);
 	
 	// Lista blocos livres
 	llDump(m_FreeBlocks);
@@ -57,9 +59,8 @@ int vogal_cache::bufferize(){
 void vogal_cache::freeBuffer(GenericPointer buf){
 	DBUG_ENTER("vogal_cache::freeBuffer");
 	
-	if (buf) {
+	if (buf)
 		free(buf);
-	}
 	
 	DBUG_LEAVE;
 }

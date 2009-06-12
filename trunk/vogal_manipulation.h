@@ -22,7 +22,6 @@ public:
 	BigNumber nextRid(CursorType * cursor);
 
 	RidCursorType * parseRecord(CursorType * cursor, ColumnCursorType * column, BlockCursorType * block, GenericPointer * offset, bool loadData);
-	int parseBlock(CursorType * cursor, ColumnCursorType * column, BlockCursorType * block, bool loadData);
 	SearchInfoType * findNearest(CursorType * cursor, RidCursorType * rid2find, DataCursorType * data2find, BlockCursorType * rootBlock);
 	int updateBlockBuffer(BlockCursorType * block);
 	

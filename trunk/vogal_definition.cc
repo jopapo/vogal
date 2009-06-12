@@ -472,3 +472,80 @@ int vogal_definition::newTable(char* name, PairListRoot * columns){
 	
 	DBUG_RETURN(tableCreated); 
 }
+
+int vogal_definition::parseBlock(CursorType * cursor, ColumnCursorType * column, BlockCursorType * block, bool loadData) {
+	DBUG_ENTER("vogal_manipulation::parseBlock");
+	
+	// Declara variáveis
+	int ret = false;
+	ValueListRoot *list = NULL;
+	RidCursorType *rid;
+	BlockOffset *nighbor;
+	BigNumber dataCount;
+	GenericPointer p;
+
+	if (!block) {
+		perror("É obrigatório informar o bloco para efetuar o parse");
+		goto freeParseBlock;
+	}
+
+	// Monta lista de rids e offsets do bloco
+	if (block->ridsList)
+		vlFree(block->ridsList);
+	block->ridsList = vlNew(true);
+	if (block->offsetsList)
+		vlFree(block->offsetsList);
+	block->offsetsList = vlNew(true);
+
+	// Posição atual
+	p = block->buffer + sizeof(BlockHeaderType);
+
+	// Lê a quantidade de registros do bloco
+	if (!m_Handler->getStorage()->readDataSize(&p, &dataCount)) {
+		perror("Erro ao ler a quantidade de registros no block");
+		goto freeParseBlock;
+	}
+
+	if (dataCount > 0) {
+		for (int i = 0; i < dataCount; i++) {
+			// Auxiliares
+			nighbor = new BlockOffset();
+			// Lê primeiro nó a esquerda
+			if (!m_Handler->getStorage()->readSizedNumber(&p, nighbor)) {
+				perror("Erro ao ler nó a esquerda da árvore de registros");
+				free(nighbor);
+				goto freeParseBlock;
+			}
+			// Adiciona informação à lista
+			vlAdd(block->offsetsList, nighbor);
+
+			rid = new RidCursorType();
+			if (!m_Handler->getManipulation()->parseRecord(cursor, column, block, &p, loadData)) {
+				rid->~RidCursorType();
+				goto freeParseBlock;
+			}
+
+			// Adiciona informação à lista
+			vlAdd(block->ridsList, rid);
+		}
+
+		// Se a quantidade for maior que zero
+		// Depois do último nó sempre tem o nó a direita
+		nighbor = new BlockOffset();
+		if (!m_Handler->getStorage()->readSizedNumber(&p, nighbor)) {
+			perror("Erro ao ler nó a direita da árvore de registros");
+			free(nighbor);
+			goto freeParseBlock;
+		}
+		// Adiciona informação à lista
+		vlAdd(block->offsetsList, nighbor);
+	}
+
+	block->freeSpace = C_BLOCK_SIZE - (p - block->buffer); // O deslocamento é o espaço usado no bloco!
+
+	ret = true;
+		
+freeParseBlock:
+	DBUG_RETURN(ret);
+
+}
