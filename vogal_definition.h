@@ -20,6 +20,7 @@ public:
 	int createStructure(int type, GenericPointer buf);
 	
 	ObjectCursorType * openTable(char * tableName);
+	int parseBlock(CursorType * cursor, ColumnCursorType * column, BlockCursorType * block, bool loadData);
 
 	int newTable(char* name, PairListRoot * columns);
 

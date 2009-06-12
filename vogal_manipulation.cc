@@ -335,80 +335,6 @@ freeParseRecord:
 
 }
 
-int vogal_manipulation::parseBlock(CursorType * cursor, ColumnCursorType * column, BlockCursorType * block, bool loadData) {
-	DBUG_ENTER("vogal_manipulation::parseBlock");
-	
-	// Declara variáveis
-	int ret = false;
-	ValueListRoot *list = NULL;
-	RidCursorType *rid;
-	BlockOffset *nighbor;
-	BigNumber dataCount;
-
-	if (!block) {
-		perror("É obrigatório informar o bloco para efetuar o parse");
-		goto freeParseBlock;
-	}
-
-	// Monta lista de rids e offsets do bloco
-	if (block->ridsList)
-		vlFree(block->ridsList);
-	block->ridsList = vlNew(true);
-	if (block->offsetsList)
-		vlFree(block->offsetsList);
-	block->offsetsList = vlNew(true);
-
-	// Posição atual
-	block->offset = block->buffer + sizeof(BlockHeaderType);
-
-	// Lê a quantidade de registros do bloco
-	if (!m_Handler->getStorage()->readDataSize(&block->offset, &dataCount)) {
-		perror("Erro ao ler a quantidade de registros no block");
-		goto freeParseBlock;
-	}
-
-	if (dataCount > 0) {
-		for (int i = 0; i < dataCount; i++) {
-			// Auxiliares
-			nighbor = new BlockOffset();
-			// Lê primeiro nó a esquerda
-			if (!m_Handler->getStorage()->readSizedNumber(&block->offset, nighbor)) {
-				perror("Erro ao ler nó a esquerda da árvore de registros");
-				free(nighbor);
-				goto freeParseBlock;
-			}
-			// Adiciona informação à lista
-			vlAdd(block->offsetsList, nighbor);
-
-			rid = new RidCursorType();
-			if (!parseRecord(cursor, column, block, &block->offset, loadData)) {
-				rid->~RidCursorType();
-				goto freeParseBlock;
-			}
-
-			// Adiciona informação à lista
-			vlAdd(block->ridsList, rid);
-		}
-
-		// Se a quantidade for maior que zero
-		// Depois do último nó sempre tem o nó a direita
-		nighbor = new BlockOffset();
-		if (!m_Handler->getStorage()->readSizedNumber(&block->offset, nighbor)) {
-			perror("Erro ao ler nó a direita da árvore de registros");
-			free(nighbor);
-			goto freeParseBlock;
-		}
-		// Adiciona informação à lista
-		vlAdd(block->offsetsList, nighbor);
-	}
-
-	ret = true;
-		
-freeParseBlock:
-	DBUG_RETURN(ret);
-
-}
-
 SearchInfoType * vogal_manipulation::findNearest(CursorType * cursor, RidCursorType * rid2find, DataCursorType * data2find, BlockCursorType * rootBlock) {
 	DBUG_ENTER("vogal_manipulation::findNearest");
 
@@ -439,7 +365,7 @@ SearchInfoType * vogal_manipulation::findNearest(CursorType * cursor, RidCursorT
 				goto freeFindNearest;
 			}
 		}
-		if (!parseBlock(cursor, data2find?data2find->column:NULL, info->findedBlock, false)) {
+		if (!m_Handler->getDefinition()->parseBlock(cursor, data2find?data2find->column:NULL, info->findedBlock, false)) {
 			perror("Erro ao obter os registros sem complementos do block!");
 			goto freeFindNearest;
 		}
@@ -502,18 +428,18 @@ int vogal_manipulation::updateBlockBuffer(BlockCursorType * block) {
 
 	int ret = false;
 	int count = 0;
+	GenericPointer p;
 
 	if (!block) {
 		perror("Bloco inválido para atualização!");
 		goto freeUpdateBlockBuffer;
 	}
-
 	
 	if (block->ridsList)
 		count = vlCount(block->ridsList);
 
-	block->offset = block->buffer + sizeof(BlockHeaderType);
-	if (!m_Handler->getStorage()->writeDataSize(&block->offset, count)) {
+	p = block->buffer + sizeof(BlockHeaderType);
+	if (!m_Handler->getStorage()->writeDataSize(&p, count)) {
 		perror("Erro ao escrever a quantidade de dados do bloco!");
 		goto freeUpdateBlockBuffer;
 	}
@@ -522,13 +448,13 @@ int vogal_manipulation::updateBlockBuffer(BlockCursorType * block) {
 		for (int i = 0; i < count; i++) {
 			BlockOffset * left = (BlockOffset *) vlGet(block->offsetsList, i);
 			RidCursorType * rid = (RidCursorType *) vlGet(block->ridsList, i);
-			if (!m_Handler->getStorage()->writeNumber((*left), &block->offset)) {
+			if (!m_Handler->getStorage()->writeNumber((*left), &p)) {
 				perror("Erro ao escrever o ponteiro para o nodo da esqueda!");
 				goto freeUpdateBlockBuffer;
 			}
 			if (block->header->type == C_BLOCK_TYPE_MAIN_TAB) {
 				// Escreve o número do RID
-				if (!m_Handler->getStorage()->writeNumber(rid->id, &block->offset)) {
+				if (!m_Handler->getStorage()->writeNumber(rid->id, &p)) {
 					perror("Erro ao escrever o rid no buffer da tabela!");
 					goto freeUpdateBlockBuffer;
 				}
@@ -536,12 +462,12 @@ int vogal_manipulation::updateBlockBuffer(BlockCursorType * block) {
 				for (int c = 0; c < vlCount(rid->dataList); c++) {
 					DataCursorType * data = (DataCursorType *) vlGet(rid->dataList, c);
 					// Escreve o endereço do bloco
-					if (!m_Handler->getStorage()->writeNumber(data->blockId, &block->offset)) {
+					if (!m_Handler->getStorage()->writeNumber(data->blockId, &p)) {
 						perror("Erro ao escrever o endereço do bloco no buffer da tabela!");
 						goto freeUpdateBlockBuffer;
 					}
 					// Escreve o deslocamento no bloco
-					if (!m_Handler->getStorage()->writeDataSize(&block->offset, data->blockOffset)) {
+					if (!m_Handler->getStorage()->writeDataSize(&p, data->blockOffset)) {
 						perror("Erro ao escrever o deslocamento no buffer da tabela!");
 						goto freeUpdateBlockBuffer;
 					}
@@ -549,23 +475,25 @@ int vogal_manipulation::updateBlockBuffer(BlockCursorType * block) {
 			} else {
 				DataCursorType * data = (DataCursorType *) vlGet(rid->dataList, 0);
 				// Escreve o dado chave da coluna
-				if (!writeDataCursor(&block->offset, data)) {
+				if (!writeDataCursor(&p, data)) {
 					perror("Erro ao escrever o dado chave no buffer da coluna!");
 					goto freeUpdateBlockBuffer;
 				}
 				// Escreve o número do RID
-				if (!m_Handler->getStorage()->writeNumber(rid->id, &block->offset)) {
+				if (!m_Handler->getStorage()->writeNumber(rid->id, &p)) {
 					perror("Erro ao escrever o rid no buffer da coluna!");
 					goto freeUpdateBlockBuffer;
 				}
 			}
 		}
 		BlockOffset * right = (BlockOffset *) vlGet(block->offsetsList, count - 1);
-		if (!m_Handler->getStorage()->writeNumber((*right), &block->offset)) {
+		if (!m_Handler->getStorage()->writeNumber((*right), &p)) {
 			perror("Erro escrever o ponteiro para o nodo da direita!");
 			goto freeUpdateBlockBuffer;
 		}
 	}
+
+	block->freeSpace = C_BLOCK_SIZE - (p - block->buffer); // O deslocamento é o espaço usado no bloco!
 
 	ret = true;
 	
@@ -593,14 +521,16 @@ int vogal_manipulation::writeData(CursorType * cursor, RidCursorType * rid, Data
 	// Inicialização das variáveis
 	if (data) {
 		block = data->column->block;
-		neededSpace =
+		neededSpace = 100;
+		/*neededSpace =
 			m_Handler->getStorage()->bytesNeeded(data->usedSize) + // Dado chave
 			m_Handler->getStorage()->bytesNeeded(sizeof(rid->id)) + // RID
-			m_Handler->getStorage()->bytesNeeded(sizeof(BlockOffset)); // Ponteiro bloco esquerda
+			m_Handler->getStorage()->bytesNeeded(sizeof(BlockOffset)); // Ponteiro bloco esquerda*/
 	} else {
 		block = cursor->table->block;
-		neededSpace =
-			m_Handler->getStorage()->bytesNeeded(data->usedSize); // RID
+		neededSpace = 100;
+		/*neededSpace =
+			m_Handler->getStorage()->bytesNeeded(data->usedSize); // RID*/
 		// + Deslocamentos!!!
 	}
 
@@ -610,13 +540,12 @@ int vogal_manipulation::writeData(CursorType * cursor, RidCursorType * rid, Data
 		//block = vlGet(info->blockList, 0);
 		block = info->rootBlock;
 
-		freeSpace = block->offset - block->buffer; // Posição atual no buffer - posição do início do buffer
-		if (freeSpace < 0 || freeSpace > C_BLOCK_SIZE - sizeof(BlockHeaderType)) {
+		if (block->freeSpace < 0 || block->freeSpace > C_BLOCK_SIZE - sizeof(BlockHeaderType)) {
 			perror("Erro ao calular espaço disponível no bloco. Fora da faixa permitida");
 			goto freeWriteData;
 		}
 
-		if (neededSpace > freeSpace) {
+		if (neededSpace > block->freeSpace) {
 			// Fudeu!
 		} else {
 			// Acha a posição do rid encontrado
@@ -647,8 +576,6 @@ int vogal_manipulation::writeData(CursorType * cursor, RidCursorType * rid, Data
 			
 		}
 	//}
-		
-	
 
 	/*BlockCursorType * findedBlock;
 	GenericPointer findedOffset;
