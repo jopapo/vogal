@@ -84,9 +84,10 @@ DataTypes vogal_utils::myType2VoType(enum enum_field_types type) {
   }
 }
 
-/*
-char * vogal_utils::cloneString(char * str){
+char * vogal_utils::cloneString(char * from){
 	DBUG_ENTER("vogal_utils::cloneString");
-	DBUG_RETURN(NULL);
+
+	char * to = new char[strlen(from) + 1];
+
+	DBUG_RETURN(strcpy(to, from));
 }
-*/

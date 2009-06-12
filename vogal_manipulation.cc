@@ -16,6 +16,10 @@ vogal_manipulation::~vogal_manipulation(){
 
 ColumnCursorType * vogal_manipulation::findColumn(ObjectCursorType* table, char * colName) {
 	DBUG_ENTER("vogal_manipulation::findColumn");
+	if (!table) {
+		perror("Impossível obter uma coluna de nenhuma tabela!");
+		DBUG_RETURN(NULL);
+	}
 	for (int i = 0; i < vlCount(table->colsList); i++) {
 		ColumnCursorType * col = (ColumnCursorType *) vlGet(table->colsList, i);
 		if (!strcmp(col->name, colName))
@@ -484,7 +488,16 @@ int vogal_manipulation::updateBlockBuffer(BlockCursorType * block) {
 	DBUG_ENTER("vogal_manipulation::updateBlockBuffer");
 
 	int ret = false;
-	int count  = vlCount(block->ridsList);
+	int count = 0;
+
+	if (!block) {
+		perror("Bloco inválido para atualização!");
+		goto freeUpdateBlockBuffer;
+	}
+
+	
+	if (block->ridsList)
+		count = vlCount(block->ridsList);
 
 	block->offset = block->buffer + sizeof(BlockHeaderType);
 	if (!m_Handler->getStorage()->writeDataSize(&block->offset, count)) {

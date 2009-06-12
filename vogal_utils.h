@@ -62,13 +62,11 @@ public:
 	vogal_utils();
 	virtual ~vogal_utils();
 
-	/*
-	char * cloneString(char * str);
-	*/
-
 	static DataTypes str2type(char * str);
 	static char* type2str(DataTypes type);
 	static DataTypes myType2VoType(enum enum_field_types type);
+
+	static char * cloneString(char * from);
 
 };
 
