@@ -58,28 +58,34 @@ vogal_manipulation* vogal_handler::getManipulation() {
 int vogal_handler::ensureSanity() {
 	DBUG_ENTER("vogal_handler::ensureSanity");
 
+	bool newDatabase = false;
+	
 	if (!getStorage()->openDatabase()) {
 		if (getStorage()->initialize()) {
-			if (!getDefinition()->createDataDictionary()) {
-				my_error(ER_ERROR_ON_WRITE, MYF(0), "Erro ao criar dicionário de dados");
-				DBUG_RETURN(false);
-			}
-			if (!getCache()->bufferize()) {
-				my_error(ER_ERROR_ON_READ, MYF(0), "Erro ao bufferizar DB");
-				DBUG_RETURN(false);
-			}
+			newDatabase = true;
 		} else {
-		  my_error(ER_CANT_CREATE_DB, MYF(0), "Erro ao criar DB");
-		  DBUG_RETURN(false);
+			perror("Erro ao criar DB");
+			DBUG_RETURN(false);
 		}
 	}
 	
-	// Verifica se os cursores do metadados estão carregados na memória
-	if (!getCache()->openDataDictionary()) {
-		my_error(ER_ERROR_ON_READ, MYF(0), "Erro ao abrir dicionário de dados");
+	if (!getCache()->bufferize()) {
+		perror("Erro ao bufferizar DB");
 		DBUG_RETURN(false);
 	}
 	
+	// Verifica se os cursores do metadados estão carregados na memória
+	// a abertura ocorre antes da criação pois a criação é física e a abertura é lógica
+	if (!getCache()->openDataDictionary()) {
+		perror("Erro ao abrir dicionário de dados");
+		DBUG_RETURN(false);
+	}
+
+	if (newDatabase)
+		if (!getDefinition()->createDataDictionary()) {
+			perror("Erro ao criar dicionário de dados");
+			DBUG_RETURN(false);
+		}
 		
 	DBUG_RETURN(true);
 }

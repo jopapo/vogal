@@ -144,13 +144,14 @@ int llPush(LinkedListRootType* root, ListDataType key) {
 	DBUG_RETURN(false);
 }
 
+// 2o caso: Busca do item na lista
 int llPop(LinkedListRootType* root, ListDataType * key) {
 	DBUG_ENTER("llPop");
 	if (!root) 
 		DBUG_RETURN(false);
-	
-	// 2o caso: Busca do item na lista
 	LinkedListType* node = root->root;
+	if (!node) 
+		DBUG_RETURN(false);
 	(*key) = node->key;
 	if (node->next) {
 		if (node->link) {
@@ -296,7 +297,7 @@ int vlFree(ValueListRoot* root) {
 		DBUG_RETURN(true);
 	if (root->owner)
 		for (int i = 0; i < root->count; i++)
-			delete root->root[i];
+			free(root->root[i]);
 	free(root->root);
 	root->root = NULL;
 	root->space = 0;
@@ -341,6 +342,10 @@ int vlInsert(ValueListRoot* root, ListValueType value, int index) {
 
 int vlCount(ValueListRoot* root) {
 	DBUG_ENTER("vlCount");
+	if (!root) {
+		DBUG_PRINT("WARN", ("Lista não existe! Retornando zero na contagem."));
+		DBUG_RETURN(0);
+	}
 	DBUG_RETURN(root->count);	
 }
 
@@ -418,13 +423,13 @@ ListValueType * plGetName(PairListRoot* root, int index) {
 }
 
 ListValueType * plGetValue(PairListRoot* root, int index) {
-	DBUG_ENTER("plGetName");
+	DBUG_ENTER("plGetValue");
 	DBUG_RETURN( vlGet(root->b, index) );
 }
 
 
 // ### StringTree ###
-/*
+
 StringTreeRoot* stNew(int nameOwner, int valueOwner) {
 	DBUG_ENTER("stNew");
 	StringTreeRoot * root = (StringTreeRoot*) malloc(sizeof(StringTreeRoot));
@@ -533,7 +538,7 @@ StringTreeIterator* stCreateIterator(StringTreeRoot* root, StringTreeNode** firs
 	DBUG_ENTER("stCreateIterator");
 	StringTreeIterator* iterator = (StringTreeIterator*) malloc(sizeof(StringTreeIterator));
 	iterator->root = root;
-	iterator->stack = vlNew();
+	iterator->stack = vlNew(false);
 	stInternalNextPush(iterator, iterator->root->root);
 	(*first) = stNext(iterator);
 	DBUG_RETURN(iterator);
@@ -573,4 +578,3 @@ TreeNodeValue stNodeValue(StringTreeNode* node) {
 		DBUG_RETURN(NULL);
 	DBUG_RETURN(node->value);
 }
-*/

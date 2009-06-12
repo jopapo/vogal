@@ -73,7 +73,6 @@ ListValueType * plGetName(PairListRoot*, int);
 ListValueType * plGetValue(PairListRoot*, int);
 
 
-/*
 // ### StringTree ###
 typedef char* TreeNodeName;
 typedef void* TreeNodeValue;
@@ -107,6 +106,5 @@ StringTreeNode* stNext(StringTreeIterator*);
 int stFreeIterator(StringTreeIterator*);
 TreeNodeName stNodeName(StringTreeNode*);
 TreeNodeValue stNodeValue(StringTreeNode*);
-*/
 
 #endif
