@@ -31,9 +31,9 @@ public:
 	int writeRid(CursorType * cursor, RidCursorType * rid);
 	int writeDataCursor(GenericPointer* dest, DataCursorType * data);
 
-	ValueListRoot * createObjectData(char* name, char* type, BlockOffset location);
-	ValueListRoot * createColumnData(BigNumber tableRid, char* name, char* type, BlockOffset location);
-	ColumnCursorType * findColumn(ObjectCursorType* table, char * colName);
+	ValueListRoot * createObjectData(CursorType * cursor, char* name, char* type, BlockOffset location);
+	ValueListRoot * createColumnData(CursorType * cursor, BigNumber tableRid, char* name, char* type, BlockOffset location);
+	ColumnCursorType * findColumn(CursorType * cursor, char * colName);
 
 private:
 	vogal_handler *m_Handler;

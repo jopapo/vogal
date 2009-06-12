@@ -73,13 +73,6 @@ int vogal_handler::ensureSanity() {
 		perror("Erro ao bufferizar DB");
 		DBUG_RETURN(false);
 	}
-	
-	// Verifica se os cursores do metadados estão carregados na memória
-	// a abertura ocorre antes da criação pois a criação é física e a abertura é lógica
-	if (!getCache()->openDataDictionary()) {
-		perror("Erro ao abrir dicionário de dados");
-		DBUG_RETURN(false);
-	}
 
 	if (newDatabase)
 		if (!getDefinition()->createDataDictionary()) {

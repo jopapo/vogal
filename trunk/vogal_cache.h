@@ -23,19 +23,14 @@ public:
 	int lockFreeBlock(BlockOffset *pos);
 	int unlockBlock(BlockOffset block);
 	
-	ObjectCursorType *getObjects();
-	ObjectCursorType *getColumns();
+	ObjectCursorType *openObjects();
+	ObjectCursorType *openColumns();
 	
-	int openDataDictionary();
-
 private:
 	vogal_handler *m_Handler;
 
 	LinkedListRootType *m_FreeBlocks;
 	LinkedListRootType *m_LockedBlocks;
-
-	ObjectCursorType *m_Objects;
-	ObjectCursorType *m_Columns;
 
 };
 
