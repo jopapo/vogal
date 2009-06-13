@@ -1,6 +1,5 @@
 
 #include "ColumnCursorType.h"
-#include "vogal_utils.h"
 
 ColumnCursorType::ColumnCursorType() {
 	DBUG_ENTER("ColumnCursorType::ColumnCursorType");
@@ -15,10 +14,8 @@ ColumnCursorType::ColumnCursorType() {
 ColumnCursorType::~ColumnCursorType() {
 	DBUG_ENTER("ColumnCursorType::~ColumnCursorType");
 
-	if (block) {
+	if (block)
 		block->~BlockCursorType();
-		block = NULL;
-	}
 		
 	DBUG_LEAVE;
 }

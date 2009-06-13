@@ -8,7 +8,7 @@ BlockCursorType::BlockCursorType() {
 	id = 0;
 	buffer = NULL;
 	freeSpace = 0;
-	ridsList = NULL;
+	nodesList = NULL;
 	offsetsList = NULL;
 	
 	DBUG_LEAVE;
@@ -19,7 +19,7 @@ BlockCursorType::~BlockCursorType() {
 	
 	vogal_cache::freeBuffer(buffer);
 	buffer = NULL;
-	vlFree(&ridsList);
+	vlFree(&nodesList);
 	vlFree(&offsetsList);
 	
 	DBUG_LEAVE;

@@ -37,7 +37,7 @@ ha_vogal_la_CXXFLAGS =	$(AM_CFLAGS) -DMYSQL_DYNAMIC_PLUGIN
 ha_vogal_la_SOURCES =	ha_vogal.cc vogal_handler.cc vogal_storage.cc vogal_cache.cc list.cc \
                       vogal_definition.cc vogal_manipulation.cc vogal_utils.cc BlockCursorType.cc \
                       CursorType.cc ColumnCursorType.cc DataCursorType.cc ObjectCursorType.cc \
-                      RidCursorType.cc SearchInfoType.cc
+                      RidCursorType.cc SearchInfoType.cc NodeType.cc
 
 EXTRA_LIBRARIES =	libvogal.a
 noinst_LIBRARIES =	@plugin_vogal_static_target@

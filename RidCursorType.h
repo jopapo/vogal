@@ -2,7 +2,7 @@
 #ifndef VOGAL_RID_CURSOR_TYPE
 #define VOGAL_RID_CURSOR_TYPE
 
-#include "DataCursorType.h"
+#include "vogal_utils.h"
 
 class RidCursorType {
 

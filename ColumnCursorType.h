@@ -2,8 +2,8 @@
 #ifndef VOGAL_COLUMN_CURSOR_TYPE
 #define VOGAL_COLUMN_CURSOR_TYPE
 
+class ColumnCursorType; // interrelacionamento do bloco com o nodo com a coluna
 #include "BlockCursorType.h"
-#include "vogal_utils.h"
 
 class ColumnCursorType {
 

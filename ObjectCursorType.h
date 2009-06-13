@@ -3,7 +3,6 @@
 #define VOGAL_OBJECT_CURSOR_TYPE
 
 #include "BlockCursorType.h"
-#include "ColumnCursorType.h"
 
 class ObjectCursorType {
 
