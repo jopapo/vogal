@@ -332,7 +332,7 @@ int vlInsert(ValueListRoot* root, ListValueType value, int index) {
 	}
 	if (!vlGrow(root))
 		DBUG_RETURN(false);
-	for (int i = root->count - 1; i > index; i--)
+	for (int i = root->count - 1; i >= index; i--)
 		root->root[i] = root->root[i-1];
 	root->root[index] = value;
 	root->count++;

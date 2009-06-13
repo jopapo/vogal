@@ -29,8 +29,8 @@ int vogal_definition::createDataDictionary(){
 	CursorType *colsCursor = NULL;
 	PairListRoot *objsColsList = NULL;
 	PairListRoot *colsColsList = NULL;
-	RidCursorType *objsRid = NULL;
-	RidCursorType *colsRid = NULL;
+	RidCursorType *objsRid;
+	RidCursorType *colsRid;
 	
 	// Definição
 	char *colsNames[] = C_COLUMNS_NAMES;
@@ -76,16 +76,18 @@ int vogal_definition::createDataDictionary(){
 	objsRid = m_Handler->getManipulation()->insertData(objsCursor, dataList);
 	if (!objsRid) {
 		perror("Erro ao inserir estrutura de dados da tabela OBJS");
+		vlFree(&dataList); // Precisa liberar o datalist pois em caso de sucesso ele é filho do RID que é liberado posteriormente
 		goto freeCreateDataDictionary;
 	}
 
+	// Não precisa liberar o dataList pois ele vira 
 	dataList = m_Handler->getManipulation()->createObjectData(objsCursor, colsCursor->table->name, C_OBJECT_TYPE_TABLE, colsCursor->table->block->id);
 	if (!dataList) {
 		perror("Erro ao criar estrutura de dados da tabela COLS");
+		vlFree(&dataList); // Precisa liberar o datalist pois em caso de sucesso ele é filho do RID que é liberado posteriormente
 		goto freeCreateDataDictionary;
 	}
-	vlFree(&dataList);
-	colsRid = m_Handler->getManipulation()->insertData(colsCursor, dataList);
+	colsRid = m_Handler->getManipulation()->insertData(objsCursor, dataList);
 	if (!colsRid) {
 		perror("Erro ao inserir estrutura de dados da tabela COLS");
 		goto freeCreateDataDictionary;
@@ -481,8 +483,8 @@ int vogal_definition::parseBlock(CursorType * cursor, ColumnCursorType * column,
 	// Declara variáveis
 	int ret = false;
 	ValueListRoot *list = NULL;
-	RidCursorType *rid;
-	BlockOffset *nighbor;
+	RidCursorType *rid = NULL;
+	BlockOffset *neighbor;
 	BigNumber dataCount;
 	GenericPointer p;
 
@@ -494,7 +496,7 @@ int vogal_definition::parseBlock(CursorType * cursor, ColumnCursorType * column,
 	// Monta lista de rids e offsets do bloco
 	if (block->ridsList)
 		vlFree(&block->ridsList);
-	block->ridsList = vlNew(false); // FALSE pois os RIDs são filhos de outras listas
+	block->ridsList = vlNew(block->header->type == C_BLOCK_TYPE_MAIN_COL); // Só é owner no caso de blocos colunas pois neste caso é criado um RID temporário que não é dono dos seus dados
 	if (block->offsetsList)
 		vlFree(&block->offsetsList);
 	block->offsetsList = vlNew(true);
@@ -511,36 +513,37 @@ int vogal_definition::parseBlock(CursorType * cursor, ColumnCursorType * column,
 	if (dataCount > 0) {
 		for (int i = 0; i < dataCount; i++) {
 			// Auxiliares
-			nighbor = new BlockOffset();
+			neighbor = new BlockOffset();
 			// Lê primeiro nó a esquerda
-			if (!m_Handler->getStorage()->readSizedNumber(&p, nighbor)) {
+			if (!m_Handler->getStorage()->readSizedNumber(&p, neighbor)) {
 				perror("Erro ao ler nó a esquerda da árvore de registros");
-				free(nighbor);
+				free(neighbor);
 				goto freeParseBlock;
 			}
 			// Adiciona informação à lista
-			vlAdd(block->offsetsList, nighbor);
+			vlAdd(block->offsetsList, neighbor);
 
-			rid = new RidCursorType();
-			if (!m_Handler->getManipulation()->parseRecord(cursor, column, block, &p, loadData)) {
-				rid->~RidCursorType();
+			rid = m_Handler->getManipulation()->parseRecord(cursor, column, block, &p, loadData);
+			if (!rid) {
+				perror("Erro ao efetuar o parse do registro!");
 				goto freeParseBlock;
 			}
 
 			// Adiciona informação à lista
 			vlAdd(block->ridsList, rid);
+			rid = NULL;
 		}
 
 		// Se a quantidade for maior que zero
 		// Depois do último nó sempre tem o nó a direita
-		nighbor = new BlockOffset();
-		if (!m_Handler->getStorage()->readSizedNumber(&p, nighbor)) {
+		neighbor = new BlockOffset();
+		if (!m_Handler->getStorage()->readSizedNumber(&p, neighbor)) {
 			perror("Erro ao ler nó a direita da árvore de registros");
-			free(nighbor);
+			free(neighbor);
 			goto freeParseBlock;
 		}
 		// Adiciona informação à lista
-		vlAdd(block->offsetsList, nighbor);
+		vlAdd(block->offsetsList, neighbor);
 	}
 
 	block->freeSpace = C_BLOCK_SIZE - (p - block->buffer); // O deslocamento é o espaço usado no bloco!
@@ -548,6 +551,9 @@ int vogal_definition::parseBlock(CursorType * cursor, ColumnCursorType * column,
 	ret = true;
 		
 freeParseBlock:
+	if (rid)
+		rid->~RidCursorType();
+
 	DBUG_RETURN(ret);
 
 }
