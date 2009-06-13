@@ -353,7 +353,6 @@ SearchInfoType * vogal_manipulation::findNearest(CursorType * cursor, RidCursorT
 		if (count) {
 			info->offset = -1;
 			for (int i = 0; i < count; i++) {
-				neighbor = (BlockOffset *) vlGet(info->findedBlock->offsetsList, i);
 				info->findedNode = (NodeType *) vlGet(info->findedBlock->nodesList, i);
 
 				if (info->findedBlock->header->type == C_BLOCK_TYPE_MAIN_TAB) {
@@ -374,13 +373,16 @@ SearchInfoType * vogal_manipulation::findNearest(CursorType * cursor, RidCursorT
 				}
 				
 				// Se for o dato for maior que o a ser procurado e terminou a busca
-				if (info->comparison < 0) {
-					if ((*neighbor)) {
-						info->findedBlock = m_Handler->getStorage()->openBlock((*neighbor));
-						if (!info->blocksList)
-							info->blocksList = vlNew(true);
-						vlAdd(info->blocksList, info->findedBlock);
-						continue;
+				if (info->comparison <= 0) {
+					if (info->comparison) {
+						neighbor = (BlockOffset *) vlGet(info->findedBlock->offsetsList, i);
+						if ((*neighbor)) {
+							info->findedBlock = m_Handler->getStorage()->openBlock((*neighbor));
+							if (!info->blocksList)
+								info->blocksList = vlNew(true);
+							vlAdd(info->blocksList, info->findedBlock);
+							continue;
+						}
 					}
 					info->offset = i;
 					break;
@@ -519,25 +521,29 @@ int vogal_manipulation::updateLocation(CursorType * cursor, NodeType * node, Blo
 		DataCursorType * data = (DataCursorType *) vlGet(info->findedNode->rid->dataList, node->data->column->getId());
 		if (!data) {
 			perror("A coluna a com deslocamento a ser atualizado não foi encontrada!");
-			goto freeupdateLocation;
+			goto freeUpdateLocation;
 		}
 		
 		data->blockId = blockId;
-		data->blockOffset = blockOffset;				
+		data->blockOffset = blockOffset;
 
-		// Grava RID
-		if (!writeData(cursor, info->findedNode->rid, NULL)) {
-			perror("Erro ao gravar atualização da coluna com deslocamento");
-			goto freeupdateLocation;
+		if (!updateBlockBuffer(info->findedBlock)) {
+			perror("Erro ao atualizar buffer da coluna com deslocamento");
+			goto freeUpdateLocation;
+		}
+
+		if (!m_Handler->getStorage()->writeBlock(info->findedBlock)) {
+			perror("Erro ao gravar bloco de dados com o deslocamento atualizado!");
+			goto freeUpdateLocation;
 		}
 
 		ret = true;
 	} else {
 		perror("Impossível atualizar o deslocamento no rid!");
-		goto freeupdateLocation;
+		goto freeUpdateLocation;
 	}
 
-freeupdateLocation:
+freeUpdateLocation:
 	if (info)
 		info->~SearchInfoType();
 
