@@ -4,7 +4,6 @@
 
 #include "vogal_utils.h"
 #include "BlockCursorType.h"
-#include "RidCursorType.h"
 
 class SearchInfoType {
 
@@ -15,7 +14,7 @@ public:
 	BlockCursorType *rootBlock;
 	ValueListRoot   *blocksList; // <BlockCursorType>
 	BlockCursorType *findedBlock;
-	RidCursorType   *findedRid;
+	NodeType        *findedNode;
 	int				 offset;
 	int				 comparision;
 	

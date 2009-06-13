@@ -7,6 +7,7 @@ class vogal_manipulation; // Interrelacionamento com a vogal_handler
 #include "vogal_utils.h"
 #include "CursorType.h"
 #include "SearchInfoType.h"
+#include "NodeType.h"
 #include "vogal_handler.h"
 
 class vogal_manipulation
@@ -21,11 +22,11 @@ public:
 	RidCursorType * readRid(CursorType * cursor);
 	BigNumber nextRid(CursorType * cursor);
 
-	RidCursorType * parseRecord(CursorType * cursor, ColumnCursorType * column, BlockCursorType * block, GenericPointer * offset, bool loadData);
+	NodeType * parseRecord(CursorType * cursor, ColumnCursorType * column, BlockCursorType * block, GenericPointer * offset);
 	SearchInfoType * findNearest(CursorType * cursor, RidCursorType * rid2find, DataCursorType * data2find, BlockCursorType * rootBlock);
 	int updateBlockBuffer(BlockCursorType * block);
 	
-	RidCursorType * insertData(CursorType* cursor, ValueListRoot* data);
+	BigNumber insertData(CursorType* cursor, ValueListRoot* data);
 	int writeData(CursorType * cursor, RidCursorType * rid, DataCursorType * data);
 	int writeRid(CursorType * cursor, RidCursorType * rid);
 	int writeDataCursor(GenericPointer* dest, DataCursorType * data);

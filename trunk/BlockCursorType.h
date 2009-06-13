@@ -4,6 +4,9 @@
 
 #include "vogal_utils.h"
 
+class BlockCursorType; // Necessário por causa do interrelacionamento NodeType->DataCursorType->ColumnCursorType
+#include "NodeType.h"
+
 class BlockCursorType {
 
 public:
@@ -18,7 +21,7 @@ public:
 
 	// Disponíveis apenas após o parse
 	int freeSpace;
-	ValueListRoot *ridsList; // <RidCursorType>
+	ValueListRoot *nodesList; // <NodeType>
 	ValueListRoot *offsetsList; // <BlockOffset>
 	
 };

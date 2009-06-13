@@ -29,8 +29,10 @@ int vogal_definition::createDataDictionary(){
 	CursorType *colsCursor = NULL;
 	PairListRoot *objsColsList = NULL;
 	PairListRoot *colsColsList = NULL;
-	RidCursorType *objsRid;
-	RidCursorType *colsRid;
+	BigNumber objsRid;
+	BigNumber colsRid;
+	BigNumber ridAux;
+	ColumnCursorType *colAux;
 	
 	// Definição
 	char *colsNames[] = C_COLUMNS_NAMES;
@@ -97,27 +99,24 @@ int vogal_definition::createDataDictionary(){
 
 	// Varre as colunas da tabela OBJS para inserção
 	for (int i = 0; i < vlCount(objsCursor->table->colsList); i++) {
-		RidCursorType *ridAux;
-		ColumnCursorType *col = (ColumnCursorType *) vlGet(objsCursor->table->colsList, i);
-		dataList = m_Handler->getManipulation()->createColumnData(colsCursor, objsRid->id, col->name, vogal_utils::type2str(col->type), col->block->id);
+		colAux = (ColumnCursorType *) vlGet(objsCursor->table->colsList, i);
+		dataList = m_Handler->getManipulation()->createColumnData(colsCursor, objsRid, colAux->name, vogal_utils::type2str(colAux->type), colAux->block->id);
 		if (!dataList) {
 			perror("Erro ao criar estrutura de dados da tabela COLS para colunas da OBJS");
 			goto freeCreateDataDictionary;
 		}
-		vlFree(&dataList);
 		ridAux = m_Handler->getManipulation()->insertData(colsCursor, dataList);
 		if (!ridAux) {
 			perror("Erro ao inserir estrutura de dados na tabela COLS para colunas OBJS");
+			vlFree(&dataList);
 			goto freeCreateDataDictionary;
 		}
-		ridAux->~RidCursorType();
 	}
 
 	// Varre as colunas da tabela COLS para inserção
 	for (int i = 0; i < vlCount(colsCursor->table->colsList); i++) {
-		RidCursorType *ridAux;
-		ColumnCursorType *col = (ColumnCursorType *) vlGet(colsCursor->table->colsList, i);
-		dataList = m_Handler->getManipulation()->createColumnData(colsCursor, colsRid->id, col->name, vogal_utils::type2str(col->type), col->block->id);
+		colAux = (ColumnCursorType *) vlGet(colsCursor->table->colsList, i);
+		dataList = m_Handler->getManipulation()->createColumnData(colsCursor, colsRid, colAux->name, vogal_utils::type2str(colAux->type), colAux->block->id);
 		if (!dataList) {
 			perror("Erro ao criar estrutura de dados da tabela COLS para colunas da OBJS");
 			goto freeCreateDataDictionary;
@@ -125,9 +124,9 @@ int vogal_definition::createDataDictionary(){
 		ridAux = m_Handler->getManipulation()->insertData(colsCursor, dataList);
 		if (!ridAux) {
 			perror("Erro ao inserir estrutura de dados na tabela COLS para colunas OBJS");
+			vlFree(&dataList);
 			goto freeCreateDataDictionary;
 		}
-		ridAux->~RidCursorType();
 	}
 
 	// Sucesso
@@ -142,10 +141,6 @@ freeCreateDataDictionary:
 		plFree(&objsColsList);
 	if (colsColsList)
 		plFree(&colsColsList);
-	if (objsRid)
-		objsRid->~RidCursorType();
-	if (colsRid)
-		colsRid->~RidCursorType();
 
 	DBUG_RETURN(ret);
 }
@@ -165,7 +160,7 @@ CursorType * vogal_definition::createTableStructure(char *name, PairListRoot *co
 	CursorType *objsCursor = NULL;
 	CursorType *colsCursor = NULL;
 	ValueListRoot *dataList = NULL;
-	RidCursorType *objRid = NULL;
+	BigNumber objRid = NULL;
 	
 	CursorType * cursor = new CursorType();
 
@@ -258,16 +253,13 @@ CursorType * vogal_definition::createTableStructure(char *name, PairListRoot *co
 			
 		// Insere colunas na COLS
 		for (int i = 0; i < vlCount(cursor->table->colsList); i++) {
-			int inserted;
-			RidCursorType *colRid;
+			BigNumber colRid;
 			ColumnCursorType *col = (ColumnCursorType *) vlGet(cursor->table->colsList, i);
-			dataList = m_Handler->getManipulation()->createColumnData(colsCursor, objRid->id, col->name, vogal_utils::type2str(col->type), col->block->id);
+			dataList = m_Handler->getManipulation()->createColumnData(colsCursor, objRid, col->name, vogal_utils::type2str(col->type), col->block->id);
 			if (!dataList) 
 				goto freeCreateTableStructure;
 			colRid = m_Handler->getManipulation()->insertData(colsCursor, dataList);
-			inserted = colRid != NULL;
-			colRid->~RidCursorType();
-			if (!inserted)
+			if (!colRid)
 				goto freeCreateTableStructure;
 		}
 	}
@@ -292,8 +284,6 @@ CursorType * vogal_definition::createTableStructure(char *name, PairListRoot *co
 	ret = true;
 
 freeCreateTableStructure:
-	if (objRid)
-		objRid->~RidCursorType();
 	if (colsCursor)
 		colsCursor->~CursorType();
 	if (objsCursor)
@@ -477,13 +467,13 @@ int vogal_definition::newTable(char* name, PairListRoot * columns){
 	DBUG_RETURN(tableCreated); 
 }
 
-int vogal_definition::parseBlock(CursorType * cursor, ColumnCursorType * column, BlockCursorType * block, bool loadData) {
+int vogal_definition::parseBlock(CursorType * cursor, ColumnCursorType * column, BlockCursorType * block) {
 	DBUG_ENTER("vogal_manipulation::parseBlock");
 	
 	// Declara variáveis
 	int ret = false;
 	ValueListRoot *list = NULL;
-	RidCursorType *rid = NULL;
+	NodeType *node = NULL;
 	BlockOffset *neighbor;
 	BigNumber dataCount;
 	GenericPointer p;
@@ -494,9 +484,9 @@ int vogal_definition::parseBlock(CursorType * cursor, ColumnCursorType * column,
 	}
 
 	// Monta lista de rids e offsets do bloco
-	if (block->ridsList)
-		vlFree(&block->ridsList);
-	block->ridsList = vlNew(block->header->type == C_BLOCK_TYPE_MAIN_COL); // Só é owner no caso de blocos colunas pois neste caso é criado um RID temporário que não é dono dos seus dados
+	if (block->nodesList)
+		vlFree(&block->nodesList);
+	block->nodesList = vlNew(true);
 	if (block->offsetsList)
 		vlFree(&block->offsetsList);
 	block->offsetsList = vlNew(true);
@@ -523,15 +513,15 @@ int vogal_definition::parseBlock(CursorType * cursor, ColumnCursorType * column,
 			// Adiciona informação à lista
 			vlAdd(block->offsetsList, neighbor);
 
-			rid = m_Handler->getManipulation()->parseRecord(cursor, column, block, &p, loadData);
-			if (!rid) {
+			node = m_Handler->getManipulation()->parseRecord(cursor, column, block, &p);
+			if (!node) {
 				perror("Erro ao efetuar o parse do registro!");
 				goto freeParseBlock;
 			}
 
 			// Adiciona informação à lista
-			vlAdd(block->ridsList, rid);
-			rid = NULL;
+			vlAdd(block->nodesList, node);
+			node = NULL;
 		}
 
 		// Se a quantidade for maior que zero
@@ -551,8 +541,8 @@ int vogal_definition::parseBlock(CursorType * cursor, ColumnCursorType * column,
 	ret = true;
 		
 freeParseBlock:
-	if (rid)
-		rid->~RidCursorType();
+	if (node)
+		node->~NodeType();
 
 	DBUG_RETURN(ret);
 
