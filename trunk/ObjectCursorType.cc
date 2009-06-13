@@ -16,10 +16,7 @@ ObjectCursorType::~ObjectCursorType() {
 	DBUG_ENTER("ObjectCursorType::~ObjectCursorType");
 	
 	// O nome não pode ser liberado pois tem outro dono
-	if (colsList) {
-		vlFree(colsList);
-		colsList = NULL;
-	}
+	vlFree(&colsList);
 	if (block) {
 		block->~BlockCursorType();
 		block = NULL;

@@ -14,11 +14,9 @@ vogal_cache::vogal_cache(vogal_handler * handler){
 vogal_cache::~vogal_cache(){
 	DBUG_ENTER("vogal_cache::~vogal_cache");
 	
-	llFree(m_FreeBlocks);
-	m_FreeBlocks = NULL;
-	llFree(m_LockedBlocks);
-	m_LockedBlocks = NULL;
-
+	llFree(&m_FreeBlocks);
+	llFree(&m_LockedBlocks);
+	
 	DBUG_LEAVE;
 }
 

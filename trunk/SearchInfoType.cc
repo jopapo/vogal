@@ -17,7 +17,7 @@ SearchInfoType::SearchInfoType() {
 SearchInfoType::~SearchInfoType() {
 	DBUG_ENTER("SearchInfoType::~SearchInfoType");
 	
-	vlFree(blocksList);
+	vlFree(&blocksList);
 	if (findedRid)
 		findedRid->~RidCursorType();
 

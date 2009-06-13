@@ -641,7 +641,7 @@ int ha_vogal::create(const char *name, TABLE *table_arg,
 	DBUG_ENTER("ha_vogal::create");
 
 	if (!vogal->ensureSanity()) {
-		my_error(ER_UNKNOWN_ERROR, MYF(0), "Erro au testar a sanidade do arquivo de dados!");
+		my_error(ER_UNKNOWN_ERROR, MYF(0), "Erro ao testar a sanidade do arquivo de dados!");
 		DBUG_RETURN(HA_ERR_GENERIC);
 	}
 
@@ -661,7 +661,7 @@ int ha_vogal::create(const char *name, TABLE *table_arg,
 	int created = vogal->getDefinition()->newTable(const_cast<char*>(name), colList);
 	if (!created)
 		my_error(ER_CANT_CREATE_TABLE, MYF(0), "Erro ao criar a tabela");
-	plFree(colList);
+	plFree(&colList);
 	if (!created)
 		DBUG_RETURN(HA_ERR_GENERIC);
   
