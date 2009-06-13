@@ -1,5 +1,5 @@
-rm /tmp/mysqld.trace
 sudo ~/mysql-5.1.34/client/mysqladmin shutdown
+rm /tmp/mysqld.trace
 
 cd /usr/local/mysql/var/
 sudo rm data.vdb

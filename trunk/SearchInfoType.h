@@ -16,7 +16,7 @@ public:
 	BlockCursorType *findedBlock;
 	NodeType        *findedNode;
 	int				 offset;
-	int				 comparision;
+	int				 comparison;
 	
 };
 

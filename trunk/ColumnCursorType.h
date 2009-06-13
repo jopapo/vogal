@@ -8,13 +8,18 @@ class ColumnCursorType; // interrelacionamento do bloco com o nodo com a coluna
 class ColumnCursorType {
 
 public:
-	ColumnCursorType();
+	ColumnCursorType(int id);
 	virtual ~ColumnCursorType();
 
 	char 			*name;
 	DataTypes	     type;
 	BlockCursorType *block;
+
+	int getId();
 	
+private:
+	int 			 m_Id;
+
 };
 
 #endif
