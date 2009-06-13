@@ -14,7 +14,7 @@ RidCursorType::RidCursorType() {
 RidCursorType::~RidCursorType() {
 	DBUG_ENTER("RidCursorType::~RidCursorType");
 	
-	vlFree(dataList);
+	vlFree(&dataList);
 	
 	DBUG_LEAVE;
 }

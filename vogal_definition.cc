@@ -84,7 +84,7 @@ int vogal_definition::createDataDictionary(){
 		perror("Erro ao criar estrutura de dados da tabela COLS");
 		goto freeCreateDataDictionary;
 	}
-	vlFree(dataList);
+	vlFree(&dataList);
 	colsRid = m_Handler->getManipulation()->insertData(colsCursor, dataList);
 	if (!colsRid) {
 		perror("Erro ao inserir estrutura de dados da tabela COLS");
@@ -102,7 +102,7 @@ int vogal_definition::createDataDictionary(){
 			perror("Erro ao criar estrutura de dados da tabela COLS para colunas da OBJS");
 			goto freeCreateDataDictionary;
 		}
-		vlFree(dataList);
+		vlFree(&dataList);
 		ridAux = m_Handler->getManipulation()->insertData(colsCursor, dataList);
 		if (!ridAux) {
 			perror("Erro ao inserir estrutura de dados na tabela COLS para colunas OBJS");
@@ -136,8 +136,10 @@ freeCreateDataDictionary:
 		objsCursor->~CursorType();
 	if (colsCursor)
 		colsCursor->~CursorType();
-	plFree(objsColsList);
-	plFree(colsColsList);
+	if (objsColsList)
+		plFree(&objsColsList);
+	if (colsColsList)
+		plFree(&colsColsList);
 	if (objsRid)
 		objsRid->~RidCursorType();
 	if (colsRid)
@@ -491,10 +493,10 @@ int vogal_definition::parseBlock(CursorType * cursor, ColumnCursorType * column,
 
 	// Monta lista de rids e offsets do bloco
 	if (block->ridsList)
-		vlFree(block->ridsList);
-	block->ridsList = vlNew(true);
+		vlFree(&block->ridsList);
+	block->ridsList = vlNew(false); // FALSE pois os RIDs são filhos de outras listas
 	if (block->offsetsList)
-		vlFree(block->offsetsList);
+		vlFree(&block->offsetsList);
 	block->offsetsList = vlNew(true);
 
 	// Posição atual

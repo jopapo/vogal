@@ -20,22 +20,24 @@ LinkedListRootType* llNew() {
 	DBUG_RETURN(root);
 }
 
-int llFreeNode(LinkedListType* node) {
+int llFreeNode(LinkedListType** node) {
 	DBUG_ENTER("llFreeNode");
 	
 	if (node) {
-		llFreeNode(node->next);
-		free(node);
+		llFreeNode(&(*node)->next);
+		free((*node));
+		(*node) = NULL;
 	}
 	
 	DBUG_RETURN(true);
 }
 
-int llFree(LinkedListRootType* root) {
+int llFree(LinkedListRootType** root) {
 	DBUG_ENTER("llFree");
 	
-	llFreeNode(root->root);
-	free(root);
+	llFreeNode(&(*root)->root);
+	free((*root));
+	(*root) = NULL;
 	
 	DBUG_RETURN(true);
 }
@@ -160,10 +162,9 @@ int llPop(LinkedListRootType* root, ListDataType * key) {
 				DBUG_RETURN(true);
 		} 
 		root->root = node->next;
-		free(node);
+		free(&node);
 	} else {
-		free(root->root);
-		root->root = NULL;
+		free(&root->root);
 	}
 	
 	DBUG_RETURN(true);
@@ -177,7 +178,7 @@ void llRemoveMerge(LinkedListRootType* root, LinkedListType* previous, LinkedLis
 	} else {
 		root->root = node->next;
 	}
-	free(node);
+	free(&node);
 	DBUG_LEAVE;
 }
 
@@ -291,18 +292,16 @@ ValueListRoot* vlNew(bool owner) {
 	DBUG_RETURN(root);
 }
 
-int vlFree(ValueListRoot* root) {
+int vlFree(ValueListRoot** root) {
 	DBUG_ENTER("vlFree");
-	if (!root)
+	if (!(*root))
 		DBUG_RETURN(true);
-	if (root->owner)
-		for (int i = 0; i < root->count; i++)
-			free(root->root[i]);
-	free(root->root);
-	root->root = NULL;
-	root->space = 0;
-	root->count = 0;
-	free(root);
+	if ((*root)->owner)
+		for (int i = 0; i < (*root)->count; i++)
+			free((*root)->root[i]);
+	free((*root)->root);
+	free((*root));
+	(*root) = NULL;
 	DBUG_RETURN(true);
 }
 
@@ -382,15 +381,16 @@ PairListRoot* plNew(bool nameOwner, bool valueOwner) {
 	DBUG_RETURN(root); 
 }
 
-int plFree(PairListRoot* root) {
+int plFree(PairListRoot** root) {
 	DBUG_ENTER("plFree");
-	if (!root)
+	if (!(*root))
 		DBUG_RETURN(true);
-	if (!vlFree(root->a))
+	if (!vlFree(&(*root)->a))
 		DBUG_RETURN(false);
-	if (!vlFree(root->b))
+	if (!vlFree(&(*root)->b))
 		DBUG_RETURN(false);
-	free(root);
+	free((*root));
+	(*root) = NULL;
 	DBUG_RETURN(true);
 }
 
@@ -441,30 +441,31 @@ StringTreeRoot* stNew(int nameOwner, int valueOwner) {
 	DBUG_RETURN(root);
 }
 
-int stFreeNode(StringTreeRoot* root, StringTreeNode* node) {
+int stFreeNode(StringTreeRoot* root, StringTreeNode** node) {
 	DBUG_ENTER("stFreeNode");
-	if (node) {
-		if (!stFreeNode(root, node->left))
+	if ((*node)) {
+		if (!stFreeNode(root, &(*node)->left))
 			DBUG_RETURN(false);
-		if (!stFreeNode(root, node->rigth))
+		if (!stFreeNode(root, &(*node)->rigth))
 			DBUG_RETURN(false);
 		if (root->nameOwner)
-			free(node->name);
+			free((*node)->name);
 		if (root->valueOwner)
-			free(node->value);
-		free(node);
+			free((*node)->value);
+		free((*node));
+		(*node) = NULL;
 	}
 	DBUG_RETURN(true);
 }
 
-int stFree(StringTreeRoot* root) {
+int stFree(StringTreeRoot** root) {
 	DBUG_ENTER("stFree");
-	if (!root)
+	if (!(*root))
 		DBUG_RETURN(true);
-	if (!stFreeNode(root, root->root))
+	if (!stFreeNode((*root), &(*root)->root))
 		DBUG_RETURN(false);
-	root->root = NULL;
-	root->count = 0;
+	free((*root));
+	(*root) = NULL;
 	DBUG_RETURN(true);
 }
 
@@ -544,12 +545,13 @@ StringTreeIterator* stCreateIterator(StringTreeRoot* root, StringTreeNode** firs
 	DBUG_RETURN(iterator);
 }
 
-int stFreeIterator(StringTreeIterator* iterator) {
+int stFreeIterator(StringTreeIterator** iterator) {
 	DBUG_ENTER("stFreeIterator");
-	if (!iterator)
+	if (!(*iterator))
 		DBUG_RETURN(true);
-	vlFree(iterator->stack);
-	free(iterator);
+	vlFree(&(*iterator)->stack);
+	free((*iterator));
+	(*iterator) = NULL;
 	DBUG_RETURN(true);
 }
 

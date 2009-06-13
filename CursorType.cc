@@ -27,10 +27,7 @@ CursorType::~CursorType() {
 		fetch->~RidCursorType();
 		fetch = NULL;
 	}
-	if (filter) {
-		plFree(filter);
-		filter = NULL;
-	}
+	plFree(&filter);
 
 	DBUG_LEAVE;
 }

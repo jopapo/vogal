@@ -28,7 +28,7 @@ typedef struct {
 } LinkedListRootType;
 
 LinkedListRootType* llNew();
-int llFree(LinkedListRootType*);
+int llFree(LinkedListRootType**);
 int llPush(LinkedListRootType*, ListDataType);
 int llPop(LinkedListRootType*, ListDataType *);
 int llRemove(LinkedListRootType*, ListDataType);
@@ -47,7 +47,7 @@ typedef struct {
 } ValueListRoot;
 
 ValueListRoot* vlNew(bool owner);
-int vlFree(ValueListRoot*);
+int vlFree(ValueListRoot**);
 int vlAdd(ValueListRoot*,ListValueType);
 int vlInsert(ValueListRoot*,ListValueType,int);
 int vlCount(ValueListRoot*);
@@ -65,7 +65,7 @@ typedef struct {
 } PairListRoot;
 
 PairListRoot* plNew(bool, bool);
-int plFree(PairListRoot*);
+int plFree(PairListRoot**);
 int plAdd(PairListRoot*,ListValueType,ListValueType);
 int plCount(PairListRoot*);
 int plGet(PairListRoot*, int, ListValueType*, ListValueType*);
@@ -97,13 +97,13 @@ typedef struct {
 } StringTreeIterator;
 
 StringTreeRoot* stNew(int, int);
-int stFree(StringTreeRoot*);
+int stFree(StringTreeRoot**);
 int stPut(StringTreeRoot*,TreeNodeName,TreeNodeValue);
 int stCount(StringTreeRoot*);
 int stGet(StringTreeRoot*,TreeNodeName,TreeNodeValue*);
 StringTreeIterator* stCreateIterator(StringTreeRoot*, StringTreeNode**);
 StringTreeNode* stNext(StringTreeIterator*);
-int stFreeIterator(StringTreeIterator*);
+int stFreeIterator(StringTreeIterator**);
 TreeNodeName stNodeName(StringTreeNode*);
 TreeNodeValue stNodeValue(StringTreeNode*);
 
