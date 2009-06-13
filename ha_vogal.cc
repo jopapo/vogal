@@ -640,10 +640,8 @@ int ha_vogal::create(const char *name, TABLE *table_arg,
 {
 	DBUG_ENTER("ha_vogal::create");
 
-	if (!vogal->ensureSanity()) {
-		my_error(ER_UNKNOWN_ERROR, MYF(0), "Erro ao testar a sanidade do arquivo de dados!");
-		DBUG_RETURN(HA_ERR_GENERIC);
-	}
+	// Teste de DEBUG!!! Remover esta linha
+	//vogal->ensureSanity();
 
 	PairListRoot * colList = plNew(false, false);
 	for (Field **field= table_arg->s->field; *field; field++) {

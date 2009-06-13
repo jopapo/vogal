@@ -206,7 +206,7 @@ CursorType * vogal_definition::createTableStructure(char *name, PairListRoot *co
 
 	// Obtém os blocos das colunas
 	for (int i = 0; i < plCount(columns); i++) {
-		ColumnCursorType *col = new ColumnCursorType();
+		ColumnCursorType *col = new ColumnCursorType(i);
 		col->name = (char *) plGetName(columns, i);
 		col->type = vogal_utils::str2type((char *) plGetValue(columns, i));
 		col->block = new BlockCursorType();
@@ -352,7 +352,7 @@ ObjectCursorType * vogal_definition::openTable(char * tableName){
 			goto freeOpenTable;
 		}
 		for (i = 0; i < C_COLUMNS_COLS_COUNT; i++) {
-			ColumnCursorType * column = new ColumnCursorType();
+			ColumnCursorType * column = new ColumnCursorType(i);
 			column->name = cols[i+C_OBJECTS_COLS_COUNT];
 			column->type = vogal_utils::str2type(types[i+C_OBJECTS_COLS_COUNT]);
 			if (!vlAdd(table->colsList, column))
@@ -375,7 +375,7 @@ ObjectCursorType * vogal_definition::openTable(char * tableName){
 		if (!table->colsList)
 			goto freeOpenTable;
 		for (i = 0; i < C_OBJECTS_COLS_COUNT; i++) {
-			ColumnCursorType * column = new ColumnCursorType();
+			ColumnCursorType * column = new ColumnCursorType(i);
 			column->name = cols[i];
 			column->type = vogal_utils::str2type(types[i]);
 			if (!vlAdd(table->colsList, column))
@@ -415,7 +415,7 @@ ObjectCursorType * vogal_definition::openTable(char * tableName){
 		goto freeOpenTable;
 	while (m_Handler->getManipulation()->fetch(colsCursor)) {
 		int check = 0;
-		ColumnCursorType * column = new ColumnCursorType();
+		ColumnCursorType * column = new ColumnCursorType(vlCount(table->colsList));
 		for (int i = 0; i < vlCount(colsCursor->fetch->dataList); i++) {
 			DataCursorType * data = (DataCursorType *) vlGet(colsCursor->fetch->dataList, i);
 			if (!strcmp(data->column->name, C_NAME_KEY)) {

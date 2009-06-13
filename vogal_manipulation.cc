@@ -317,13 +317,13 @@ SearchInfoType * vogal_manipulation::findNearest(CursorType * cursor, RidCursorT
 	// Declara
 	SearchInfoType * info = NULL;
 	BlockOffset * neighbor;
+	int count;
 
 	// Inicializa variáveis
 	info = new SearchInfoType();
 	info->rootBlock = rootBlock;
 	info->blocksList = vlNew(true);
 	info->findedBlock = rootBlock;
-	int count;
 
 	while (true) {
 		if (!info->findedBlock) {
@@ -351,28 +351,30 @@ SearchInfoType * vogal_manipulation::findNearest(CursorType * cursor, RidCursorT
 		}
 		count = vlCount(info->findedBlock->nodesList);
 		if (count) {
+			info->offset = -1;
 			for (int i = 0; i < count; i++) {
 				neighbor = (BlockOffset *) vlGet(info->findedBlock->offsetsList, i);
 				info->findedNode = (NodeType *) vlGet(info->findedBlock->nodesList, i);
 
 				if (info->findedBlock->header->type == C_BLOCK_TYPE_MAIN_TAB) {
-					info->comparision = DIFF(rid2find->id, info->findedNode->rid->id);
+					info->comparison = DIFF(rid2find->id, info->findedNode->rid->id);
 				} else {
 					// Comparação
 					switch (data2find->column->type) {
 						case NUMBER:
-							info->comparision = DIFF((BigNumber*)data2find->content, (BigNumber*)info->findedNode->data->content);
+							info->comparison = DIFF((BigNumber*)data2find->content, (BigNumber*)info->findedNode->data->content);
 							break;
 						case VARCHAR:
-							info->comparision = strncmp((char *) data2find->content, (char *) info->findedNode->data->content, MIN(data2find->usedSize, info->findedNode->data->usedSize));
+							info->comparison = strncmp((char *) data2find->content, (char *) info->findedNode->data->content, MIN(data2find->usedSize, info->findedNode->data->usedSize));
 							break;
 						default:
 							perror("Comparação não preparada para o tipo!");
 							goto freeFindNearest;
 					}
 				}
+				
 				// Se for o dato for maior que o a ser procurado e terminou a busca
-				if (info->comparision < 0) {
+				if (info->comparison < 0) {
 					if ((*neighbor)) {
 						info->findedBlock = m_Handler->getStorage()->openBlock((*neighbor));
 						if (!info->blocksList)
@@ -384,6 +386,9 @@ SearchInfoType * vogal_manipulation::findNearest(CursorType * cursor, RidCursorT
 					break;
 				}
 			}
+			if (info->offset < 0)
+				info->offset = count;
+			
 			neighbor = (BlockOffset *) vlGet(info->findedBlock->offsetsList, count); // Direita!
 			if (neighbor && (*neighbor)) {
 				info->findedBlock = m_Handler->getStorage()->openBlock((*neighbor));
@@ -500,6 +505,44 @@ int vogal_manipulation::writeDataCursor(GenericPointer* dest, DataCursorType * d
 	DBUG_RETURN( m_Handler->getStorage()->writeAnyData(dest, (GenericPointer)data->content, data->column->type) );
 }
 
+int vogal_manipulation::updateLocation(CursorType * cursor, NodeType * node, BlockOffset blockId, BlockOffset blockOffset) {
+	DBUG_ENTER("vogal_manipulation::updateLocation");
+
+	// Declarações
+	int ret = false;
+	SearchInfoType * info;
+
+	// Se não achou em memória, faz a busca na base
+	info = findNearest(cursor, node->rid, NULL, cursor->table->block);
+	if (info && !info->comparison) {
+		// Procura a coluna com offset atualizado
+		DataCursorType * data = (DataCursorType *) vlGet(info->findedNode->rid->dataList, node->data->column->getId());
+		if (!data) {
+			perror("A coluna a com deslocamento a ser atualizado não foi encontrada!");
+			goto freeupdateLocation;
+		}
+		
+		data->blockId = blockId;
+		data->blockOffset = blockOffset;				
+
+		// Grava RID
+		if (!writeData(cursor, info->findedNode->rid, NULL)) {
+			perror("Erro ao gravar atualização da coluna com deslocamento");
+			goto freeupdateLocation;
+		}
+
+		ret = true;
+	} else {
+		perror("Impossível atualizar o deslocamento no rid!");
+		goto freeupdateLocation;
+	}
+
+freeupdateLocation:
+	if (info)
+		info->~SearchInfoType();
+
+	DBUG_RETURN(ret);
+}
 
 // TODO: Tornar o índice balanceado
 int vogal_manipulation::writeData(CursorType * cursor, RidCursorType * rid, DataCursorType * data) {
@@ -540,6 +583,19 @@ int vogal_manipulation::writeData(CursorType * cursor, RidCursorType * rid, Data
 	if (info) {
 		offset = info->offset;
 		block = info->findedBlock;
+
+		// Reorganizar deslocamentos dos rids a direita (se estivar gravando um dado)
+		// TODO: Otimizar para fazer todas as operações em memória e gravar em disco apenas uma vez
+		if (data && offset < vlCount(block->nodesList)) {
+			for (int i = offset; i < vlCount(block->nodesList); i++) {
+				NodeType * otherNode = (NodeType *) vlGet(block->nodesList, offset);
+				if (!updateLocation(cursor, otherNode, block->id, offset + 1)) {
+					perror("Erro ao atualizar o deslocamento das colunas do bloco!");
+					goto freeWriteData;
+				}
+			}
+		}
+
 	} else {
 		offset = 0;
 		neededSpace += m_Handler->getStorage()->bytesNeeded(sizeof(BlockOffset)); // Ponteiro bloco direita
@@ -551,13 +607,14 @@ int vogal_manipulation::writeData(CursorType * cursor, RidCursorType * rid, Data
 		goto freeWriteData;
 	}
 
-	// ################################################
-	// #### ATUALIZAR OFFSET DAS COLUNAS À DIREITA ####
-	// ################################################
-
+	// Cria novo nodo e insere no local adequado
 	node = new NodeType();
 	node->rid = rid;
 	node->data = data;
+	if (data) {
+		data->blockId = block->id;
+		data->blockOffset = offset;
+	}
 	
 	vlInsert(block->nodesList, node, offset);
 
@@ -666,7 +723,7 @@ int vogal_manipulation::fetch(CursorType * cursor){
 			TreeNodeValue value;
 			ColumnCursorType * column;
 			DataCursorType * data;
-			int comparision;
+			int comparison;
 			
 			if (!stGet(cursor->table->colsList, stNodeName(iNode), &value))
 				goto freeFetch;    
@@ -678,17 +735,17 @@ int vogal_manipulation::fetch(CursorType * cursor){
 			// Comparação
 			switch (column->type) {
 				case NUMBER:
-					comparision = (BigNumber*)data->content - (BigNumber*) stNodeValue(iNode);
+					comparison = (BigNumber*)data->content - (BigNumber*) stNodeValue(iNode);
 					break;
 				case VARCHAR:
 					// Comparação
-					comparision = memcmp(data->content, stNodeValue(iNode), MIN(data->allocSize, strlen((char*)stNodeValue(iNode))));
+					comparison = memcmp(data->content, stNodeValue(iNode), MIN(data->allocSize, strlen((char*)stNodeValue(iNode))));
 					break;
 				default:
 					perror("Comparação não preparada para o tipo!");
 					goto freeFetch;
 			}
-			if (comparision) {
+			if (comparison) {
 				validFetch = false;
 				break;
 			}

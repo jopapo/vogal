@@ -1,9 +1,10 @@
 
 #include "ColumnCursorType.h"
 
-ColumnCursorType::ColumnCursorType() {
+ColumnCursorType::ColumnCursorType(int id) {
 	DBUG_ENTER("ColumnCursorType::ColumnCursorType");
-	
+
+	m_Id = id;
 	name = NULL;
 	type = UNKNOWN;
 	block = NULL;
@@ -18,4 +19,9 @@ ColumnCursorType::~ColumnCursorType() {
 		block->~BlockCursorType();
 		
 	DBUG_LEAVE;
+}
+
+int ColumnCursorType::getId() {
+	DBUG_ENTER("ColumnCursorType::getId");
+	DBUG_RETURN(m_Id);
 }
