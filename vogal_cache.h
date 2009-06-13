@@ -17,7 +17,7 @@ public:
 
 	int bufferize();
 
-	static GenericPointer blankBuffer();
+	static GenericPointer blankBuffer(int size = C_BLOCK_SIZE);
 	static void freeBuffer(GenericPointer buf);
 	
 	int lockFreeBlock(BlockOffset *pos);

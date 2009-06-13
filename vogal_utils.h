@@ -39,7 +39,11 @@
 #define C_COLUMNS_TYPES {C_TYPE_VARCHAR,C_TYPE_VARCHAR,C_TYPE_NUMBER,C_TYPE_NUMBER,C_TYPE_VARCHAR,C_TYPE_VARCHAR,C_TYPE_NUMBER};
 	
 // ### MACROS ###
-#define MIN(x,y) x < y?x:y
+#define MIN(x,y) x<y?x:y
+
+// TODO: Melhorar rotina de comparação por causa da performance, aqui a comparação pode ser executada duas vezes.
+//		 Por enquanto é necessário pois o dado pode ser grande demais para caber num inteiro
+#define DIFF(a,b) a>b?1:a<b?-1:0
 
 // ### SUBTIPOS ###
 typedef enum {NUMBER,FLOAT,DATE,VARCHAR,UNKNOWN} DataTypes;

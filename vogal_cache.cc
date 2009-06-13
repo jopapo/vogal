@@ -21,13 +21,12 @@ vogal_cache::~vogal_cache(){
 }
 
 // Otimizar para trabalhar na HEAP com um certo tamanho pré-alocado
-GenericPointer vogal_cache::blankBuffer(){
+GenericPointer vogal_cache::blankBuffer(int size){
 	DBUG_ENTER("vogal_cache::blankBuffer");
 	
-	GenericPointer buf = new unsigned char[C_BLOCK_SIZE];
-	//(GenericPointer) malloc(C_BLOCK_SIZE);
+	GenericPointer buf = (GenericPointer) malloc(sizeof(unsigned char) * size);
 	// Não precisaria mas é interessante para visibilidade do código binário gravado no arquivão
-	memset(buf, 0x00, C_BLOCK_SIZE); 
+	memset(buf, 0x00, size); 
 	
 	DBUG_RETURN(buf);
 }

@@ -149,8 +149,6 @@ RidCursorType * vogal_manipulation::insertData(CursorType* cursor, ValueListRoot
 	DBUG_ENTER("vogal_manipulation::insertData");
 
 	int ret = false;
-	GenericPointer p;
-
 	RidCursorType * newRid = NULL;
 	
 	if (!cursor) {
@@ -282,30 +280,21 @@ RidCursorType * vogal_manipulation::parseRecord(CursorType * cursor, ColumnCurso
 		// Carga e alocação dos dados
 		switch (data->column->type) {
 			case NUMBER:
-				if (!data->content) {
-					data->allocSize = sizeof(BigNumber); // Sempre é númeral máximo tratado, no caso LONG LONG INT (64BITS)
-					data->content = (GenericPointer) malloc(data->allocSize);
-				}
+				data->allocSize = sizeof(BigNumber); // Sempre é númeral máximo tratado, no caso LONG LONG INT (64BITS)
 				if (data->usedSize > data->allocSize) {
-					perror("Informação inconsistente na base pois não pode haver númeoros maiores que 64 bits (20 dígitos)");
+					perror("Informação inconsistente na base pois não pode haver númeoros maiores que 64 bits (20 dígitos)"); // Ainda...
 					goto freeParseRecord;
 				}
 				break;
 			case VARCHAR:
 				// Tamanho máximo permitido até o momento
-				if (data->usedSize >= data->allocSize) {
-					if (data->content)
-						free(data->content);
-					data->allocSize = data->usedSize + 1; // Mais 1 para o Null Terminated String
-					data->content = (GenericPointer) malloc(data->allocSize);
-				}
+				data->allocSize = data->usedSize + 1; // Mais 1 para o Null Terminated String
 				break;
 			default: // TODO (Pendência): Implementar comparação de todos os tipos de dados
 				perror("Tipo de campo ainda não implementado!");
 				goto freeParseRecord;
 		}
-		// Zera para evitar informação errônea
-		memset(data->content, 0x00, data->allocSize);
+		data->content = vogal_cache::blankBuffer(data->allocSize);
 		// Lê o dado
 		if (!m_Handler->getStorage()->readData(offset, data->content, data->usedSize, data->allocSize, data->column->type)) {
 			perror("Erro ao ler dado do bloco!");
@@ -338,8 +327,12 @@ freeParseRecord:
 SearchInfoType * vogal_manipulation::findNearest(CursorType * cursor, RidCursorType * rid2find, DataCursorType * data2find, BlockCursorType * rootBlock) {
 	DBUG_ENTER("vogal_manipulation::findNearest");
 
+	// Declara
+	SearchInfoType * info = NULL;
+	BlockOffset * neighbor;
+
 	// Inicializa variáveis
-	SearchInfoType * info = new SearchInfoType();
+	info = new SearchInfoType();
 	info->rootBlock = rootBlock;
 	info->blocksList = vlNew(true);
 	info->findedBlock = rootBlock;
@@ -370,39 +363,36 @@ SearchInfoType * vogal_manipulation::findNearest(CursorType * cursor, RidCursorT
 			goto freeFindNearest;
 		}
 		count = vlCount(info->findedBlock->ridsList);
-		if (count <= 0) {
-			DBUG_PRINT("INFO", ("Bloco vazio!"));
-			goto freeFindNearest;
-		}
+		if (count) {
+			for (int i = 0; i < count; i++) {
+				neighbor = (BlockOffset *) vlGet(info->findedBlock->offsetsList, i);
+				info->findedRid = (RidCursorType *) vlGet(info->findedBlock->ridsList, i);
 
-		for (int i = 0; i < vlCount(info->findedBlock->ridsList); i++) {
-			BlockOffset * left = (BlockOffset *) vlGet(info->findedBlock->offsetsList, i);
-			info->findedRid = (RidCursorType *) vlGet(info->findedBlock->ridsList, i);
-
-			if (info->findedBlock->header->type == C_BLOCK_TYPE_MAIN_TAB) {
-				info->comparision = rid2find->id - info->findedRid->id;
-			} else {
-				if (vlCount(info->findedRid->dataList) <= 0) {
-					perror("Nenhum dado a ser localizado!");
-					goto freeFindNearest;
-				}
-				DataCursorType * data = (DataCursorType *) vlGet(info->findedRid->dataList, 0);
-				// Comparação
-				switch (data2find->column->type) {
-					case NUMBER:
-						info->comparision = (BigNumber*)data2find->content - (BigNumber*)data->content;
-						break;
-					case VARCHAR:
-						info->comparision = memcmp(data2find->content, data->content, MIN(data2find->usedSize, data->usedSize));
-						break;
-					default:
-						perror("Comparação não preparada para o tipo!");
+				if (info->findedBlock->header->type == C_BLOCK_TYPE_MAIN_TAB) {
+					info->comparision = DIFF(rid2find->id, info->findedRid->id);
+				} else {
+					if (vlCount(info->findedRid->dataList) <= 0) {
+						perror("Nenhum dado a ser localizado!");
 						goto freeFindNearest;
+					}
+					DataCursorType * data = (DataCursorType *) vlGet(info->findedRid->dataList, 0);
+					// Comparação
+					switch (data2find->column->type) {
+						case NUMBER:
+							info->comparision = DIFF((BigNumber*)data2find->content, (BigNumber*)data->content);
+							break;
+						case VARCHAR:
+							info->comparision = strncmp((char *) data2find->content, (char *) data->content, MIN(data2find->usedSize, data->usedSize));
+							break;
+						default:
+							perror("Comparação não preparada para o tipo!");
+							goto freeFindNearest;
+					}
 				}
 				// Se for o dato for maior que o a ser procurado e terminou a busca
-				if (info->comparision < 0 && !data->usedSize) {
-					if (left) {
-						info->findedBlock = m_Handler->getStorage()->openBlock((*left));
+				if (info->comparision < 0) {
+					if (neighbor) {
+						info->findedBlock = m_Handler->getStorage()->openBlock((*neighbor));
 						if (!info->blocksList)
 							info->blocksList = vlNew(true);
 						vlAdd(info->blocksList, info->findedBlock);
@@ -412,6 +402,19 @@ SearchInfoType * vogal_manipulation::findNearest(CursorType * cursor, RidCursorT
 					break;
 				}
 			}
+			neighbor = (BlockOffset *) vlGet(info->findedBlock->offsetsList, count); // Direita!
+			if (neighbor && (*neighbor)) {
+				info->findedBlock = m_Handler->getStorage()->openBlock((*neighbor));
+				if (!info->blocksList)
+					info->blocksList = vlNew(true);
+				vlAdd(info->blocksList, info->findedBlock);
+				continue;
+			} else {
+				break;
+			}
+		} else {
+			DBUG_PRINT("INFO", ("Bloco vazio!"));
+			goto freeFindNearest;
 		}
 	}
 	DBUG_RETURN(info);
@@ -510,7 +513,11 @@ freeUpdateBlockBuffer:
 
 int vogal_manipulation::writeDataCursor(GenericPointer* dest, DataCursorType * data) {
 	DBUG_ENTER("vogal_manipulation::writeDataCursor");
-	DBUG_RETURN(m_Handler->getStorage()->writeAnyData(dest, (GenericPointer)data, data->column->type) );
+	if (!data) {
+		perror("Impossível gravar 'nada'!");
+		DBUG_RETURN(false);
+	}
+	DBUG_RETURN( m_Handler->getStorage()->writeAnyData(dest, (GenericPointer)data->content, data->column->type) );
 }
 
 
@@ -568,15 +575,27 @@ int vogal_manipulation::writeData(CursorType * cursor, RidCursorType * rid, Data
 	// #### ATUALIZAR OFFSET DAS COLUNAS À DIREITA ####
 	// ################################################
 
-	vlInsert(block->ridsList, rid, offset);
+	
+	if (data) {
+		newRid = new RidCursorType();
+		newRid->id = rid->id;
+		newRid->dataList = vlNew(false); // Os dados são doutro owner
+		vlAdd(newRid->dataList, data);
+	} else {
+		newRid = rid;
+	}
+	vlInsert(block->ridsList, newRid, offset);
 
 	// Esquerda e direita apontando para o vazio!
 	neighbor = new BlockOffset();
 	(*neighbor) = 0;
 	vlInsert(block->offsetsList, neighbor, offset);
-	neighbor = new BlockOffset();
-	(*neighbor) = 0;
-	vlInsert(block->offsetsList, neighbor, offset + 1);
+	// Somente insere vizinho da direita se for o primeiro rid do bloco
+	if (vlCount(block->offsetsList) == 1) {
+		neighbor = new BlockOffset();
+		(*neighbor) = 0;
+		vlInsert(block->offsetsList, neighbor, offset + 1);
+	}
 
 	if (neededSpace > block->freeSpace) {
 		// ################################################
