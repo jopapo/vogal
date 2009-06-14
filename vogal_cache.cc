@@ -37,7 +37,7 @@ int vogal_cache::bufferize(){
 	// Bufferizando blocos vazios de dados
 	GenericPointer buf = blankBuffer();
 	// Posiciona no primeiro bloco que não é de controle
-	for (long int offset = C_COLUMNS_BLOCK + 1; m_Handler->getStorage()->readBlock(offset, buf); offset++) {
+	for (long int offset = C_OBJECTS_COLS_COUNT + C_COLUMNS_COLS_COUNT + 2; m_Handler->getStorage()->readBlock(offset, buf); offset++) {
 		BlockHeaderType * header = (BlockHeaderType *) buf;
 		// Verifica se o primeiro bit está ativo, se não estive, está vazio
 		if (!header->valid) {

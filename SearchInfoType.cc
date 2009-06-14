@@ -10,7 +10,8 @@ SearchInfoType::SearchInfoType() {
 	findedNode = NULL;
 	offset = 0;
 	comparison = 0;
-
+	compared = false;
+	
 	DBUG_LEAVE;
 }
 
@@ -18,8 +19,8 @@ SearchInfoType::~SearchInfoType() {
 	DBUG_ENTER("SearchInfoType::~SearchInfoType");
 	
 	vlFree(&blocksList);
-	if (findedNode)
-		findedNode->~NodeType();
+	/*if (findedNode) // Liberado na limpeza dos blocos
+		findedNode->~NodeType();*/
 
 	DBUG_LEAVE;
 }

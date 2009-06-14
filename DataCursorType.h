@@ -17,6 +17,7 @@ public:
 	GenericPointer    content;
 	BlockOffset 	  blockId;
 	BlockOffset 	  blockOffset;
+	bool			  contentOwner;
 	
 };
 

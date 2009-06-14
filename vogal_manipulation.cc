@@ -293,108 +293,123 @@ freeParseRecord:
 
 }
 
+int vogal_manipulation::comparison(SearchInfoType * info, CursorType * cursor, RidCursorType * rid2find, DataCursorType * data2find, int startingOffset) {
+	DBUG_ENTER("vogal_manipulation::comparison");
+
+	int ret = false;
+	int count;
+	BlockOffset * neighbor;
+	
+	if (!info) {
+		perror("As informações de busca já devem ter sido inicializadas!");
+		goto freeComparison;
+	}
+
+continueWhileComparison:
+	if (!info->findedBlock) {
+		perror("Por qual bloco começar?!");
+		goto freeComparison;
+	}
+	if (!info->findedBlock->buffer) {
+		perror("Bloco não bufferizado para efetuar o parse!");
+		goto freeComparison;
+	}
+	if (info->findedBlock->header->type == C_BLOCK_TYPE_MAIN_TAB) {
+		if (!rid2find) {
+			perror("Nenhum rid para localização!");
+			goto freeComparison;
+		}
+	} else {
+		if (!data2find) {
+			perror("Nenhum dado para localização!");
+			goto freeComparison;
+		}
+	}
+	if (!startingOffset) 
+		if (!m_Handler->getDefinition()->parseBlock(cursor, data2find?data2find->column:NULL, info->findedBlock)) {
+			perror("Erro ao obter os registros sem complementos do block!");
+			goto freeComparison;
+		}
+
+	count = vlCount(info->findedBlock->nodesList);
+	if (count) {
+		info->offset = -1;
+		for (int i = startingOffset; i < count; i++) {
+			info->compared = false;
+			info->findedNode = (NodeType *) vlGet(info->findedBlock->nodesList, i);
+			
+			if (info->findedBlock->header->type == C_BLOCK_TYPE_MAIN_TAB) {
+				info->comparison = DIFF(rid2find->id, info->findedNode->rid->id);
+			} else {
+				// Comparação
+				switch (data2find->column->type) {
+					case NUMBER:
+						info->comparison = DIFF((BigNumber*)data2find->content, (BigNumber*)info->findedNode->data->content);
+						break;
+					case VARCHAR:
+						info->comparison = strncmp((char *) data2find->content, (char *) info->findedNode->data->content, MIN(data2find->usedSize, info->findedNode->data->usedSize));
+						break;
+					default:
+						perror("Comparação não preparada para o tipo!");
+						goto freeComparison;
+				}
+				info->compared = true;
+			}
+			
+			// Se for o dato for maior que o a ser procurado e terminou a busca
+			if (info->comparison <= 0) {
+				if (info->comparison) {
+					neighbor = (BlockOffset *) vlGet(info->findedBlock->offsetsList, i);
+					if ((*neighbor)) {
+						info->findedBlock = m_Handler->getStorage()->openBlock((*neighbor));
+						if (!info->blocksList)
+							info->blocksList = vlNew(false);
+						vlAdd(info->blocksList, info->findedBlock);
+						startingOffset = 0;
+						goto continueWhileComparison;
+					}
+				}
+				info->offset = i;
+				break;
+			}
+		}
+		if (info->offset < 0)
+			info->offset = count;
+		neighbor = (BlockOffset *) vlGet(info->findedBlock->offsetsList, count); // Direita!
+		if (neighbor && (*neighbor)) {
+			info->findedBlock = m_Handler->getStorage()->openBlock((*neighbor));
+			if (!info->blocksList)
+				info->blocksList = vlNew(false);
+			vlAdd(info->blocksList, info->findedBlock);
+			startingOffset = 0;
+			goto continueWhileComparison;
+		}
+	} else {
+		DBUG_PRINT("INFO", ("Bloco vazio!"));
+	}
+
+	ret = true;
+	
+freeComparison:
+	DBUG_RETURN(ret);
+}
+
 SearchInfoType * vogal_manipulation::findNearest(CursorType * cursor, RidCursorType * rid2find, DataCursorType * data2find, BlockCursorType * rootBlock) {
 	DBUG_ENTER("vogal_manipulation::findNearest");
 
 	// Declara
-	SearchInfoType * info = NULL;
-	BlockOffset * neighbor;
-	int count;
-
-	// Inicializa variáveis
-	info = new SearchInfoType();
+	SearchInfoType * info = new SearchInfoType();
 	info->rootBlock = rootBlock;
 	info->blocksList = vlNew(true);
 	info->findedBlock = rootBlock;
 
-	while (true) {
-		if (!info->findedBlock) {
-			perror("Por qual bloco começar?!");
-			goto freeFindNearest;
-		}
-		if (!info->findedBlock->buffer) {
-			perror("Bloco não bufferizado para efetuar o parse!");
-			goto freeFindNearest;
-		}
-		if (info->findedBlock->header->type == C_BLOCK_TYPE_MAIN_TAB) {
-			if (!rid2find) {
-				perror("Nenhum rid para localização!");
-				goto freeFindNearest;
-			}
-		} else {
-			if (!data2find) {
-				perror("Nenhum dado para localização!");
-				goto freeFindNearest;
-			}
-		}
-		if (!m_Handler->getDefinition()->parseBlock(cursor, data2find?data2find->column:NULL, info->findedBlock)) {
-			perror("Erro ao obter os registros sem complementos do block!");
-			goto freeFindNearest;
-		}
-		count = vlCount(info->findedBlock->nodesList);
-		if (count) {
-			info->offset = -1;
-			for (int i = 0; i < count; i++) {
-				info->findedNode = (NodeType *) vlGet(info->findedBlock->nodesList, i);
-
-				if (info->findedBlock->header->type == C_BLOCK_TYPE_MAIN_TAB) {
-					info->comparison = DIFF(rid2find->id, info->findedNode->rid->id);
-				} else {
-					// Comparação
-					switch (data2find->column->type) {
-						case NUMBER:
-							info->comparison = DIFF((BigNumber*)data2find->content, (BigNumber*)info->findedNode->data->content);
-							break;
-						case VARCHAR:
-							info->comparison = strncmp((char *) data2find->content, (char *) info->findedNode->data->content, MIN(data2find->usedSize, info->findedNode->data->usedSize));
-							break;
-						default:
-							perror("Comparação não preparada para o tipo!");
-							goto freeFindNearest;
-					}
-				}
-				
-				// Se for o dato for maior que o a ser procurado e terminou a busca
-				if (info->comparison <= 0) {
-					if (info->comparison) {
-						neighbor = (BlockOffset *) vlGet(info->findedBlock->offsetsList, i);
-						if ((*neighbor)) {
-							info->findedBlock = m_Handler->getStorage()->openBlock((*neighbor));
-							if (!info->blocksList)
-								info->blocksList = vlNew(true);
-							vlAdd(info->blocksList, info->findedBlock);
-							continue;
-						}
-					}
-					info->offset = i;
-					break;
-				}
-			}
-			if (info->offset < 0)
-				info->offset = count;
-			
-			neighbor = (BlockOffset *) vlGet(info->findedBlock->offsetsList, count); // Direita!
-			if (neighbor && (*neighbor)) {
-				info->findedBlock = m_Handler->getStorage()->openBlock((*neighbor));
-				if (!info->blocksList)
-					info->blocksList = vlNew(true);
-				vlAdd(info->blocksList, info->findedBlock);
-				continue;
-			} else {
-				break;
-			}
-		} else {
-			DBUG_PRINT("INFO", ("Bloco vazio!"));
-			goto freeFindNearest;
-		}
-	}
-	DBUG_RETURN(info);
-
-freeFindNearest:
-	if (info)
+	if (!comparison(info, cursor, rid2find, data2find)) {
+		perror("Erro durante o processo de comparação!");
 		info->~SearchInfoType();
-		
-	DBUG_RETURN(NULL);
+		DBUG_RETURN(NULL);
+	}
+
+	DBUG_RETURN(info);
 }
 
 int vogal_manipulation::updateBlockBuffer(BlockCursorType * block) {
@@ -734,28 +749,65 @@ int vogal_manipulation::fetch(FilterCursorType * filter){
 
 	int ret = false;
 
-	// ######################
-	// TÁ COM PAU!!!
-	// ######################
-	
+	if (!filter || !filter->cursor || !filter->cursor->table || !filter->cursor->table->block) {
+		perror("Cursor de filtro inválido para efetuar o fetch!");
+		goto freeFetch;
+	}
+
+	if (filter->empty) {
+		DBUG_PRINT("INFO", ("Fim dos dados!"));
+		goto freeFetch;
+	}
+
 	if (!filter->opened) {
 		// Obtém o rid do dado a ser localizado
-		filter->infoData = findNearest(filter->cursor, NULL, filter->data, filter->column->block);
-
-		// Obtém as localizações de todos os dados do rid localizado
-		filter->infoFetch = findNearest(filter->cursor, filter->infoData->findedNode->rid, NULL, filter->cursor->table->block);
-
-		// Por enquanto obtém todas as colunas
-		// TODO: Pegar somente as colunas solicitadas
-		for (int d = 0; d < vlCount(filter->infoFetch->findedNode->rid->dataList); d++)
-			fillDataFromLocation(filter->cursor, (DataCursorType*) vlGet(filter->infoFetch->findedNode->rid->dataList, d));
-		
-		filter->fetch = filter->infoFetch->findedNode->rid;
-
+		filter->infoData = findNearest(filter->cursor, NULL, filter->data, filter->data->column->block);
+		if (!filter->infoData || !filter->infoData->findedNode) {
+			perror("Erro ao tentar localizar o dado!");
+			goto freeFetch;
+		}
 		filter->opened = true;
-	}
-		
-freeFetch:
+	} else {
+		// Varredura da árvore
+		if (!filter->infoData->findedBlock) {
+			perror("Nenhum bloco aberto na busca inicial. Impossível continuar!");
+			goto freeFetch;
+		}
 
+		if (!comparison(filter->infoData, filter->cursor, NULL, filter->data, filter->infoData->offset+1)) {
+			perror("Erro durante o processo de comparação dos dados para obtenção do próximo fetch!");
+			goto freeFetch;
+		}
+	}
+
+	// Verifica grau de identificação, no caso, tem que ser igual!
+	if (filter->infoData->comparison) {
+		DBUG_PRINT("INFO", ("Dado não encontrado"));
+		filter->empty = true;
+		goto freeFetch;
+	}
+
+	// Obtém as localizações de todos os dados do rid localizado
+	filter->infoFetch = findNearest(filter->cursor, filter->infoData->findedNode->rid, NULL, filter->cursor->table->block);
+	if (!filter->infoFetch || !filter->infoFetch->findedNode) {
+		perror("Erro ao tentar localizar o rid!");
+		goto freeFetch;
+	}
+
+	filter->fetch = filter->infoFetch->findedNode->rid;
+	if (!filter->fetch || !filter->fetch->dataList) {
+		perror("Erro ao identificar RID localizado!");
+		goto freeFetch;
+	}
+
+	// Por enquanto obtém todas as colunas
+	// TODO: Pegar somente as colunas solicitadas
+	for (int d = 0; d < vlCount(filter->fetch->dataList); d++)
+		if (!fillDataFromLocation(filter->cursor, (DataCursorType*) vlGet(filter->fetch->dataList, d))) {
+			perror("Erro ao preencher as colunas com os dados de seus deslocamentos");
+			goto freeFetch;
+		}
+
+freeFetch:
 	DBUG_RETURN(ret);
 }
