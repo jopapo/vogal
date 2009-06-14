@@ -164,15 +164,16 @@ freeInsertData:
 	DBUG_RETURN(0);
 }
 
-int vogal_manipulation::removeFetch(SearchInfoType * info) {
+int vogal_manipulation::removeFetch(FilterCursorType * filter) {
 	DBUG_ENTER("vogal_manipulation::removeFetch");
 
 	DataCursorType * data;
 	BlockCursorType * block = NULL;
+	NodeType * node;
 
 	// Atualiza dados
-	for (int i = 0; i < vlCount(info->fetch->dataList); i++) {
-		data = (DataCursorType *) vlGet(info->fetch->dataList, i);
+	for (int i = 0; i < vlCount(filter->fetch->dataList); i++) {
+		data = (DataCursorType *) vlGet(filter->fetch->dataList, i);
 
 		block = m_Handler->getStorage()->openBlock(data->blockId);
 		if (!block) {
@@ -180,7 +181,7 @@ int vogal_manipulation::removeFetch(SearchInfoType * info) {
 			goto freeRemoveFetch;
 		}
 
-		if (!m_Handler->getDefinition()->parseBlock(info->cursor, NULL, block)) {
+		if (!m_Handler->getDefinition()->parseBlock(filter->cursor, NULL, block)) {
 			perror("Erro ao efetuar o parse ao carregar dado da coluna!");
 			goto freeRemoveFetch;
 		}
@@ -193,7 +194,7 @@ int vogal_manipulation::removeFetch(SearchInfoType * info) {
 		node->deleted = true;
 
 		// Atualiza e grava
-		if (!updateBlockBuffer(block)) {
+		if (!updateBlockBuffer(filter->cursor, block)) {
 			perror("Erro ao atualizar o buffer do bloco!");
 			goto freeRemoveFetch;
 		}
@@ -205,19 +206,19 @@ int vogal_manipulation::removeFetch(SearchInfoType * info) {
 		
 	}
 
-	if (!info->findedNode) {
+	if (!filter->infoFetch || !filter->infoFetch->findedNode) {
 		perror("Erro ao localizar nodo específico do RID!");
 		goto freeRemoveFetch;
 	}
-	info->findedNode->deleted = true;
+	filter->infoFetch->findedNode->deleted = true;
 
 	// Atualiza e grava
-	if (!updateBlockBuffer(info->findedBlock)) {
+	if (!updateBlockBuffer(filter->cursor, filter->infoFetch->findedBlock)) {
 		perror("Erro ao atualizar o buffer do bloco dos rids!");
 		goto freeRemoveFetch;
 	}
 
-	if (!m_Handler->getStorage()->writeBlock(info->findedNode)) {
+	if (!m_Handler->getStorage()->writeBlock(filter->infoFetch->findedBlock)) {
 		perror("Erro ao gravar bloco dos rids!");
 		goto freeRemoveFetch;
 	}
@@ -547,9 +548,9 @@ int vogal_manipulation::updateBlockBuffer(CursorType * cursor, BlockCursorType *
 				// Se excluiu algum antes, atualiza pais
 				if (deleted) {
 					// TODO: Otimizar para fazer todas as operações em memória e gravar em disco apenas uma vez
-					if (!updateLocation(cursor, node, block->id, offset - deleted)) {
+					if (!updateLocation(cursor, node, block->id, i - deleted)) {
 						perror("Erro ao atualizar o deslocamento das colunas do bloco!");
-						goto freeWriteData;
+						goto freeUpdateBlockBuffer;
 					}
 				}
 			}
@@ -607,7 +608,7 @@ int vogal_manipulation::updateLocation(CursorType * cursor, NodeType * node, Blo
 
 		// TODO: CUIDADO!!! Nunca encher muito o bloco pois na atualização do deslocamento normalmente se ocupam mais ou menos blocos na
 		//		hora de escrevê-lo. Portanto, nunca encher o bloco por completo
-		if (!updateBlockBuffer(info->findedBlock)) {
+		if (!updateBlockBuffer(cursor, info->findedBlock)) {
 			perror("Erro ao atualizar buffer da coluna com deslocamento");
 			goto freeUpdateLocation;
 		}
@@ -724,7 +725,7 @@ int vogal_manipulation::writeData(CursorType * cursor, RidCursorType * rid, Data
 		goto freeWriteData;
 		
 	} else {
-		if (!updateBlockBuffer(block)) {
+		if (!updateBlockBuffer(cursor, block)) {
 			perror("Erro ao atualizar o buffer do bloco!");
 			goto freeWriteData;
 		}

@@ -33,7 +33,7 @@ public:
 	int writeData(CursorType * cursor, RidCursorType * rid, DataCursorType * data);
 	int writeRid(CursorType * cursor, RidCursorType * rid);
 	int writeDataCursor(GenericPointer* dest, DataCursorType * data);
-	int removeFetch(SearchInfoType * info);
+	int removeFetch(FilterCursorType * filter);
 
 	ValueListRoot * createObjectData(CursorType * cursor, char* name, char* type, BlockOffset location);
 	ValueListRoot * createColumnData(CursorType * cursor, BigNumber tableRid, char* name, char* type, BlockOffset location);
