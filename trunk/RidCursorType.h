@@ -11,7 +11,7 @@ public:
 	virtual ~RidCursorType();
 
 	BigNumber	   id;
-	ValueListRoot *dataList; // <DataCursorType> 
+	ValueListRoot *dataList; // <DataCursorType>
 	
 };
 

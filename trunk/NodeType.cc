@@ -7,6 +7,7 @@ NodeType::NodeType() {
 	rid = NULL;
 	data = NULL;
 	dataOwner = false;
+	deleted = false;
 	
 	DBUG_LEAVE;
 }

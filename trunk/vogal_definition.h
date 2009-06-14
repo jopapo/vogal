@@ -23,6 +23,7 @@ public:
 	int parseBlock(CursorType * cursor, ColumnCursorType * column, BlockCursorType * block);
 
 	int newTable(char* name, PairListRoot * columns);
+	int dropTable(char* name);
 	ColumnCursorType * findColumn(ObjectCursorType* table, char * colName);
 
 private:
