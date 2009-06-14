@@ -1,5 +1,6 @@
 
 #include "vogal_definition.h"
+#include "FilterCursorType.h"
 
 vogal_definition::vogal_definition(vogal_handler *handler){
 	DBUG_ENTER("vogal_definition::vogal_definition");
@@ -232,12 +233,12 @@ CursorType * vogal_definition::createTableStructure(char *name, PairListRoot *co
 	// Se não for do dicionário de dados, insere os registros
 	if (!dict) {
 		// Abre cursores dos objetos e coluns
-		objsCursor = m_Handler->getManipulation()->openCursor(m_Handler->getCache()->openObjects(), NULL);
+		objsCursor = m_Handler->getManipulation()->openCursor(m_Handler->getCache()->openObjects());
 		if (!objsCursor) {
 			perror("Erro ao abrir cursor da tabela OBJS!");
 			goto freeCreateTableStructure;
 		}
-		colsCursor = m_Handler->getManipulation()->openCursor(m_Handler->getCache()->openColumns(), NULL);
+		colsCursor = m_Handler->getManipulation()->openCursor(m_Handler->getCache()->openColumns());
 		if (!colsCursor) {
 			perror("Erro ao abrir cursor da tabela COLS!");
 			goto freeCreateTableStructure;
@@ -319,6 +320,20 @@ int vogal_definition::createStructure(int type, GenericPointer buf){
 	DBUG_RETURN(true);
 }
 
+ColumnCursorType * vogal_definition::findColumn(ObjectCursorType* table, char * colName) {
+	DBUG_ENTER("vogal_definition::findColumn");
+	if (!table) {
+		perror("Impossível obter uma coluna de nenhuma tabela!");
+		DBUG_RETURN(NULL);
+	}
+	for (int i = 0; i < vlCount(table->colsList); i++) {
+		ColumnCursorType * col = (ColumnCursorType *) vlGet(table->colsList, i);
+		if (!strcmp(col->name, colName))
+			DBUG_RETURN(col);
+	}
+	DBUG_RETURN(NULL);
+}
+
 ObjectCursorType * vogal_definition::openTable(char * tableName){
 // TODO (Pendência): Todo este processo de busca das tabelas e colunas deve ser bufferizado para melhorar o desempenho
 //   e evitar acesso a disco desnecessariamente!
@@ -327,10 +342,10 @@ ObjectCursorType * vogal_definition::openTable(char * tableName){
 	// Auxiliares
 	int i;
 	int ret = false;
-	PairListRoot * pair = NULL;
 	
-	CursorType * objsCursor = NULL;
 	CursorType * colsCursor = NULL;
+	FilterCursorType * objsFilter = NULL;
+	FilterCursorType * colsFilter = NULL;
 
 	// Começa a inicializar a tabela
 	ObjectCursorType * table = new ObjectCursorType();
@@ -384,49 +399,76 @@ ObjectCursorType * vogal_definition::openTable(char * tableName){
 		ret = true;
 		goto freeOpenTable;
 	}
-	
+
+	// Cria objeto de filtro
+	objsFilter = new FilterCursorType();
+	objsFilter->cursor = m_Handler->getManipulation()->openCursor(m_Handler->getCache()->openObjects());
+
 	// Senão, deve obter através das tabelas do dicionário de dados
-	pair = plNew(false, false);
-	plAdd(pair, const_cast<char*>(C_NAME_KEY), tableName); // Filtro pelo nome da tabela
-	objsCursor = m_Handler->getManipulation()->openCursor(m_Handler->getCache()->openObjects(), pair);
-	if (!objsCursor) {
+	if (!objsFilter->cursor || !objsFilter->cursor->table) {
 		perror("Impossível abrir cursor dos objetos!");
 		goto freeOpenTable;
 	}
 
+	objsFilter->column = findColumn(objsFilter->cursor->table, C_NAME_KEY);
+	if (!objsFilter->column) {
+		perror("Coluna do metadados correspondente ao nome da tabela não pode ser encontrada!");
+		goto freeOpenTable;
+	}
+
+	objsFilter->data = new DataCursorType();
+	objsFilter->data->content = (GenericPointer) tableName;
+	objsFilter->data->usedSize = strlen(tableName);
+	objsFilter->data->allocSize = objsFilter->data->usedSize + 1;
+
 	// Procura a tabela	
-	if (!m_Handler->getManipulation()->fetch(objsCursor)) {
+	if (!m_Handler->getManipulation()->fetch(objsFilter)) {
 		perror("Tabela não encontrada!"); 
 		goto freeOpenTable;
 	}
 	
 	// Obtém as colunas da tablea
-	pair = plNew(false, false);
-	plAdd(pair, const_cast<char*>(C_TABLE_RID_KEY), &objsCursor->fetch->id); // Filtro pelo RID da tabela
-	colsCursor = m_Handler->getManipulation()->openCursor(m_Handler->getCache()->openColumns(), pair);
-	if (!colsCursor) {
+	colsFilter = new FilterCursorType();
+	colsFilter->cursor = m_Handler->getManipulation()->openCursor(m_Handler->getCache()->openColumns());
+
+	if (!colsFilter->cursor || !colsFilter->cursor->table) {
 		perror("Impossível abrir cursor das colunas!");
 		goto freeOpenTable;
 	}
+
+	colsFilter->column = findColumn(colsFilter->cursor->table, C_TABLE_RID_KEY);
+	if (!colsFilter->column) {
+		perror("Coluna do metadados correspondente ao RID da tabela não pode ser encontrada!");
+		goto freeOpenTable;
+	}
+	
+	colsFilter->data = new DataCursorType();
+	colsFilter->data->content = (GenericPointer) objsFilter->fetch->id;
+	colsFilter->data->usedSize = sizeof(BigNumber);
+	colsFilter->data->allocSize = colsFilter->data->usedSize;
 
 	// Varre as colunas da tabela	
 	table->colsList = vlNew(true);
 	if (!table->colsList)
 		goto freeOpenTable;
-	while (m_Handler->getManipulation()->fetch(colsCursor)) {
+	while (m_Handler->getManipulation()->fetch(colsFilter)) {
 		int check = 0;
 		ColumnCursorType * column = new ColumnCursorType(vlCount(table->colsList));
-		for (int i = 0; i < vlCount(colsCursor->fetch->dataList); i++) {
-			DataCursorType * data = (DataCursorType *) vlGet(colsCursor->fetch->dataList, i);
+		for (int i = 0; i < vlCount(colsFilter->fetch->dataList); i++) {
+			DataCursorType * data = (DataCursorType *) vlGet(colsFilter->fetch->dataList, i);
 			if (!strcmp(data->column->name, C_NAME_KEY)) {
 				column->name = (char*) data->content;
 				check++;
 			} else if (!strcmp(data->column->name, C_TYPE_KEY)) {
 				column->type = vogal_utils::str2type((char*) data->content);
 				check++;
+			} else if (!strcmp(data->column->name, C_LOCATION_KEY)) {
+				column->block = new BlockCursorType();
+				column->block->id = (*(BigNumber *) data->content );
+				check++;
 			}
 		}
-		if (check != 2) {
+		if (check != 3) {
 			perror("Erro ao obter a estrutura (colunas) da tabela!");
 			goto freeOpenTable;
 		}
@@ -437,10 +479,10 @@ ObjectCursorType * vogal_definition::openTable(char * tableName){
 	ret = true;
 	
 freeOpenTable:
-	if (objsCursor)
-		objsCursor->~CursorType();
-	if (colsCursor)
-		colsCursor->~CursorType();
+	if (objsFilter)
+		objsFilter->~FilterCursorType();
+	if (colsFilter)
+		colsFilter->~FilterCursorType();
 	if (!ret) {
 		if (table)
 			table->~ObjectCursorType();
@@ -490,7 +532,7 @@ int vogal_definition::parseBlock(CursorType * cursor, ColumnCursorType * column,
 	if (block->offsetsList)
 		vlFree(&block->offsetsList);
 	block->offsetsList = vlNew(true);
-
+	
 	// Posição atual
 	p = block->buffer + sizeof(BlockHeaderType);
 
