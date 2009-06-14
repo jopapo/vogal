@@ -35,8 +35,8 @@ public:
 	int writeDataCursor(GenericPointer* dest, DataCursorType * data);
 	int removeFetch(FilterCursorType * filter);
 
-	ValueListRoot * createObjectData(CursorType * cursor, char* name, char* type, BlockOffset location);
-	ValueListRoot * createColumnData(CursorType * cursor, BigNumber tableRid, char* name, char* type, BlockOffset location);
+	ValueListRoot * createObjectData(CursorType * cursor, char* name, char* type, BlockOffset* location);
+	ValueListRoot * createColumnData(CursorType * cursor, BigNumber* tableRid, char* name, char* type, BlockOffset* location);
 
 private:
 	vogal_handler *m_Handler;

@@ -24,7 +24,7 @@ DataTypes vogal_utils::str2type(char * str){
 	if (!strcmp(str, C_TYPE_FLOAT))
 		DBUG_RETURN(FLOAT);
 
-	ERROR( "Tipo de dado não identificado!");
+	ERROR("Tipo de dado não identificado!");
 	DBUG_RETURN(UNKNOWN);
 }
 
@@ -38,7 +38,7 @@ char* vogal_utils::type2str(DataTypes type){
 		case FLOAT: DBUG_RETURN(C_TYPE_FLOAT);
 	}
 
-	ERROR( "Tipo de dado não identificado!");
+	ERROR("Tipo de dado não identificado!");
 	DBUG_RETURN(C_TYPE_UNKNOWN);
 }
 
