@@ -442,7 +442,7 @@ ObjectCursorType * vogal_definition::openTable(char * tableName) {
 
 	// Procura a tabela	
 	if (!m_Handler->getManipulation()->fetch(objsFilter)) {
-		DBUG_PRINT("INFO", "Tabela não encontrada!");
+		DBUG_PRINT("INFO", ("Tabela não encontrada!"));
 		goto freeOpenTable;
 	}
 	
