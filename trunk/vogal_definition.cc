@@ -4,9 +4,9 @@
 
 vogal_definition::vogal_definition(vogal_handler *handler){
 	DBUG_ENTER("vogal_definition::vogal_definition");
-	
+
 	m_Handler = handler;
-	
+
 	DBUG_LEAVE;
 }
 
@@ -211,12 +211,18 @@ CursorType * vogal_definition::createTableStructure(char *name, PairListRoot *co
 		col->name = (char *) plGetName(columns, i);
 		col->type = vogal_utils::str2type((char *) plGetValue(columns, i));
 		col->block = new BlockCursorType();
-		col->block->buffer = vogal_cache::blankBuffer();
-		if (!m_Handler->getCache()->lockFreeBlock(&col->block->id)) {
-			perror("Não existem blocos disponíveis para criação das colunas da tabela!");
-			col->~ColumnCursorType();
-			goto freeCreateTableStructure;
+		if (dict) {
+			col->block->id = 2 + i;
+			if (cursor->table->block->id == C_COLUMNS_BLOCK)
+				col->block->id += C_OBJECTS_COLS_COUNT;
+		} else {
+			if (!m_Handler->getCache()->lockFreeBlock(&col->block->id)) {
+				perror("Não existem blocos disponíveis para criação das colunas da tabela!");
+				col->~ColumnCursorType();
+				goto freeCreateTableStructure;
+			}
 		}
+		col->block->buffer = vogal_cache::blankBuffer();
 		// Monta estrutura da coluna
 		if (!createStructure(C_BLOCK_TYPE_MAIN_COL, col->block->buffer)) {
 			perror("Erro ao criar estrutura da coluna!");
@@ -334,7 +340,7 @@ ColumnCursorType * vogal_definition::findColumn(ObjectCursorType* table, char * 
 	DBUG_RETURN(NULL);
 }
 
-ObjectCursorType * vogal_definition::openTable(char * tableName){
+ObjectCursorType * vogal_definition::openTable(char * tableName) {
 // TODO (Pendência): Todo este processo de busca das tabelas e colunas deve ser bufferizado para melhorar o desempenho
 //   e evitar acesso a disco desnecessariamente!
 	DBUG_ENTER("vogal_definition::openTable");
@@ -370,6 +376,12 @@ ObjectCursorType * vogal_definition::openTable(char * tableName){
 			ColumnCursorType * column = new ColumnCursorType(i);
 			column->name = cols[i+C_OBJECTS_COLS_COUNT];
 			column->type = vogal_utils::str2type(types[i+C_OBJECTS_COLS_COUNT]);
+			column->block = m_Handler->getStorage()->openBlock(2 + i + C_OBJECTS_COLS_COUNT);
+			if (!column->block) {
+				perror("Erro ao abrir bloco de dados das colunas da tabela COLS!");
+				column->~ColumnCursorType();
+				goto freeOpenTable;
+			}
 			if (!vlAdd(table->colsList, column))
 				goto freeOpenTable;
 		}
@@ -393,6 +405,12 @@ ObjectCursorType * vogal_definition::openTable(char * tableName){
 			ColumnCursorType * column = new ColumnCursorType(i);
 			column->name = cols[i];
 			column->type = vogal_utils::str2type(types[i]);
+			column->block = m_Handler->getStorage()->openBlock(2 + i);
+			if (!column->block) {
+				perror("Erro ao abrir bloco de dados das colunas da tabela OBJS!");
+				column->~ColumnCursorType();
+				goto freeOpenTable;
+			}
 			if (!vlAdd(table->colsList, column))
 				goto freeOpenTable;
 		}
@@ -410,20 +428,21 @@ ObjectCursorType * vogal_definition::openTable(char * tableName){
 		goto freeOpenTable;
 	}
 
-	objsFilter->column = findColumn(objsFilter->cursor->table, C_NAME_KEY);
-	if (!objsFilter->column) {
-		perror("Coluna do metadados correspondente ao nome da tabela não pode ser encontrada!");
-		goto freeOpenTable;
-	}
-
 	objsFilter->data = new DataCursorType();
 	objsFilter->data->content = (GenericPointer) tableName;
 	objsFilter->data->usedSize = strlen(tableName);
 	objsFilter->data->allocSize = objsFilter->data->usedSize + 1;
+	objsFilter->data->contentOwner = false;
+
+	objsFilter->data->column = findColumn(objsFilter->cursor->table, C_NAME_KEY);
+	if (!objsFilter->data->column) {
+		perror("Coluna do metadados correspondente ao nome da tabela não pode ser encontrada!");
+		goto freeOpenTable;
+	}
 
 	// Procura a tabela	
 	if (!m_Handler->getManipulation()->fetch(objsFilter)) {
-		perror("Tabela não encontrada!"); 
+		DBUG_PRINT("INFO", "Tabela não encontrada!");
 		goto freeOpenTable;
 	}
 	
@@ -436,17 +455,18 @@ ObjectCursorType * vogal_definition::openTable(char * tableName){
 		goto freeOpenTable;
 	}
 
-	colsFilter->column = findColumn(colsFilter->cursor->table, C_TABLE_RID_KEY);
-	if (!colsFilter->column) {
-		perror("Coluna do metadados correspondente ao RID da tabela não pode ser encontrada!");
-		goto freeOpenTable;
-	}
-	
 	colsFilter->data = new DataCursorType();
 	colsFilter->data->content = (GenericPointer) objsFilter->fetch->id;
 	colsFilter->data->usedSize = sizeof(BigNumber);
 	colsFilter->data->allocSize = colsFilter->data->usedSize;
+	colsFilter->data->contentOwner = false;
 
+	colsFilter->data->column = findColumn(colsFilter->cursor->table, C_TABLE_RID_KEY);
+	if (!colsFilter->data->column) {
+		perror("Coluna do metadados correspondente ao RID da tabela não pode ser encontrada!");
+		goto freeOpenTable;
+	}
+	
 	// Varre as colunas da tabela	
 	table->colsList = vlNew(true);
 	if (!table->colsList)
@@ -463,8 +483,7 @@ ObjectCursorType * vogal_definition::openTable(char * tableName){
 				column->type = vogal_utils::str2type((char*) data->content);
 				check++;
 			} else if (!strcmp(data->column->name, C_LOCATION_KEY)) {
-				column->block = new BlockCursorType();
-				column->block->id = (*(BigNumber *) data->content );
+				column->block = m_Handler->getStorage()->openBlock((*(BigNumber *) data->content ));
 				check++;
 			}
 		}

@@ -4,8 +4,8 @@
 FilterCursorType::FilterCursorType() {
 	DBUG_ENTER("FilterCursorType::FilterType");
 	opened = false;
+	empty = false;
 	cursor = NULL;
-	column = NULL;
 	data = NULL;
 	fetch = NULL;
 	infoData = NULL;
@@ -19,8 +19,8 @@ FilterCursorType::~FilterCursorType() {
 		data->~DataCursorType();
 	if (cursor)
 		cursor->~CursorType();
-	if (fetch)
-		fetch->~RidCursorType();
+	/*if (fetch)
+		fetch->~RidCursorType();*/ // Liberado abaixo, no infoFetch
 	if (infoData)
 		infoData->~SearchInfoType();
 	if (infoFetch)

@@ -12,8 +12,8 @@ public:
 	virtual ~FilterCursorType();
 
 	bool 			  opened;
+	bool			  empty;
 	CursorType		 *cursor;
-	ColumnCursorType *column;
 	DataCursorType	 *data;
 	RidCursorType 	 *fetch;
 	SearchInfoType   *infoData;
