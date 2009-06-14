@@ -416,7 +416,7 @@ continueWhileComparison:
 				// Comparação
 				switch (data2find->column->type) {
 					case NUMBER:
-						info->comparison = DIFF((BigNumber*)data2find->content, (BigNumber*)info->findedNode->data->content);
+						info->comparison = DIFF((*(BigNumber*)data2find->content), (*(BigNumber*)info->findedNode->data->content));
 						break;
 					case VARCHAR:
 						info->comparison = strncmp((char *) data2find->content, (char *) info->findedNode->data->content, MIN(data2find->usedSize, info->findedNode->data->usedSize));
