@@ -13,7 +13,8 @@ public:
 
 	RidCursorType  *rid;
 	DataCursorType *data;
-	bool dataOwner;
+	bool 			dataOwner;
+	bool			deleted;
 	
 };
 

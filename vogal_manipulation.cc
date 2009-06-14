@@ -164,6 +164,71 @@ freeInsertData:
 	DBUG_RETURN(0);
 }
 
+int vogal_manipulation::removeFetch(SearchInfoType * info) {
+	DBUG_ENTER("vogal_manipulation::removeFetch");
+
+	DataCursorType * data;
+	BlockCursorType * block = NULL;
+
+	// Atualiza dados
+	for (int i = 0; i < vlCount(info->fetch->dataList); i++) {
+		data = (DataCursorType *) vlGet(info->fetch->dataList, i);
+
+		block = m_Handler->getStorage()->openBlock(data->blockId);
+		if (!block) {
+			perror("Erro ao abrir bloco para remover dado da coluna!");
+			goto freeRemoveFetch;
+		}
+
+		if (!m_Handler->getDefinition()->parseBlock(info->cursor, NULL, block)) {
+			perror("Erro ao efetuar o parse ao carregar dado da coluna!");
+			goto freeRemoveFetch;
+		}
+
+		node = (NodeType *) vlGet(block->nodesList, data->blockOffset);
+		if (!node) {
+			perror("Erro ao localizar nodo específico do dado da coluna!");
+			goto freeRemoveFetch;
+		}
+		node->deleted = true;
+
+		// Atualiza e grava
+		if (!updateBlockBuffer(block)) {
+			perror("Erro ao atualizar o buffer do bloco!");
+			goto freeRemoveFetch;
+		}
+
+		if (!m_Handler->getStorage()->writeBlock(block)) {
+			perror("Erro ao gravar bloco de dados!");
+			goto freeRemoveFetch;
+		}
+		
+	}
+
+	if (!info->findedNode) {
+		perror("Erro ao localizar nodo específico do RID!");
+		goto freeRemoveFetch;
+	}
+	info->findedNode->deleted = true;
+
+	// Atualiza e grava
+	if (!updateBlockBuffer(info->findedBlock)) {
+		perror("Erro ao atualizar o buffer do bloco dos rids!");
+		goto freeRemoveFetch;
+	}
+
+	if (!m_Handler->getStorage()->writeBlock(info->findedNode)) {
+		perror("Erro ao gravar bloco dos rids!");
+		goto freeRemoveFetch;
+	}
+
+freeRemoveFetch:
+	if (block)
+		block->~BlockCursorType();
+	
+	DBUG_RETURN(true);
+}
+
 CursorType * vogal_manipulation::openCursor(ObjectCursorType * object){
 	DBUG_ENTER("vogal_manipulation::openCursor");
 
@@ -232,11 +297,6 @@ NodeType * vogal_manipulation::parseRecord(CursorType * cursor, ColumnCursorType
 			vlAdd(node->rid->dataList, data);
 		}
 	} else {
-		if (!column) {
-			perror("A coluna é obrigatória na leitura de blocos de colunas!");
-			goto freeParseRecord;
-		}
-
 		node->data = new DataCursorType();
 		node->data->column = column;
 		
@@ -253,29 +313,33 @@ NodeType * vogal_manipulation::parseRecord(CursorType * cursor, ColumnCursorType
 		}
 
 		// Carga e alocação dos dados
-		switch (node->data->column->type) {
-			case NUMBER:
-				node->data->allocSize = sizeof(BigNumber); // Sempre é númeral máximo tratado, no caso LONG LONG INT (64BITS)
-				if (node->data->usedSize > node->data->allocSize) {
-					perror("Informação inconsistente na base pois não pode haver númeoros maiores que 64 bits (20 dígitos)"); // Ainda...
+		if (node->data->column) {
+			switch (node->data->column->type) {
+				case NUMBER:
+					node->data->allocSize = sizeof(BigNumber); // Sempre é númeral máximo tratado, no caso LONG LONG INT (64BITS)
+					if (node->data->usedSize > node->data->allocSize) {
+						perror("Informação inconsistente na base pois não pode haver númeoros maiores que 64 bits (20 dígitos)"); // Ainda...
+						goto freeParseRecord;
+					}
+					break;
+				case VARCHAR:
+					// Tamanho máximo permitido até o momento
+					node->data->allocSize = node->data->usedSize + 1; // Mais 1 para o Null Terminated String
+					break;
+				default: // TODO (Pendência): Implementar comparação de todos os tipos de dados
+					perror("Tipo de campo ainda não implementado!");
 					goto freeParseRecord;
-				}
-				break;
-			case VARCHAR:
-				// Tamanho máximo permitido até o momento
-				node->data->allocSize = node->data->usedSize + 1; // Mais 1 para o Null Terminated String
-				break;
-			default: // TODO (Pendência): Implementar comparação de todos os tipos de dados
-				perror("Tipo de campo ainda não implementado!");
+			}
+			node->data->content = vogal_cache::blankBuffer(node->data->allocSize);
+			// Lê o dado
+			if (!m_Handler->getStorage()->readData(offset, node->data->content, node->data->usedSize, node->data->allocSize, node->data->column->type)) {
+				perror("Erro ao ler dado do bloco!");
 				goto freeParseRecord;
+			}
+		} else {
+			// Pula o dado
+			offset += node->data->usedSize;
 		}
-		node->data->content = vogal_cache::blankBuffer(node->data->allocSize);
-		// Lê o dado
-		if (!m_Handler->getStorage()->readData(offset, node->data->content, node->data->usedSize, node->data->allocSize, node->data->column->type)) {
-			perror("Erro ao ler dado do bloco!");
-			goto freeParseRecord;
-		}
-
 		// Lê o número do RID
 		if (!m_Handler->getStorage()->readSizedNumber(offset, &node->rid->id)) {
 			perror("Erro ao ler o rid do dado!");
@@ -412,7 +476,7 @@ SearchInfoType * vogal_manipulation::findNearest(CursorType * cursor, RidCursorT
 	DBUG_RETURN(info);
 }
 
-int vogal_manipulation::updateBlockBuffer(BlockCursorType * block) {
+int vogal_manipulation::updateBlockBuffer(CursorType * cursor, BlockCursorType * block) {
 	DBUG_ENTER("vogal_manipulation::updateBlockBuffer");
 
 	int ret = false;
@@ -436,9 +500,15 @@ int vogal_manipulation::updateBlockBuffer(BlockCursorType * block) {
 	}
 
 	if (count > 0) {
+		int writed = 0;
+		int deleted = 0;
 		for (int i = 0; i < count; i++) {
 			neighbor = (BlockOffset *) vlGet(block->offsetsList, i);
 			node = (NodeType *) vlGet(block->nodesList, i);
+			if (node->deleted) {
+				deleted++;
+				continue;
+			}
 			if (!m_Handler->getStorage()->writeNumber((*neighbor), &p)) {
 				perror("Erro ao escrever o ponteiro para o nodo da esqueda!");
 				goto freeUpdateBlockBuffer;
@@ -474,16 +544,27 @@ int vogal_manipulation::updateBlockBuffer(BlockCursorType * block) {
 					perror("Erro ao escrever o rid no buffer da coluna!");
 					goto freeUpdateBlockBuffer;
 				}
+				// Se excluiu algum antes, atualiza pais
+				if (deleted) {
+					// TODO: Otimizar para fazer todas as operações em memória e gravar em disco apenas uma vez
+					if (!updateLocation(cursor, node, block->id, offset - deleted)) {
+						perror("Erro ao atualizar o deslocamento das colunas do bloco!");
+						goto freeWriteData;
+					}
+				}
 			}
+			writed++;
 		}
-		if (vlCount(block->offsetsList) != count + 1) {
-			perror("A quantidade de ponteiros no nó deve ser a de registros + 1!");
-			goto freeUpdateBlockBuffer;
-		}
-		neighbor = (BlockOffset *) vlGet(block->offsetsList, count);
-		if (!m_Handler->getStorage()->writeNumber((*neighbor), &p)) {
-			perror("Erro escrever o ponteiro para o nodo da direita!");
-			goto freeUpdateBlockBuffer;
+		if (writed) {
+			if (vlCount(block->offsetsList) != count + 1) {
+				perror("A quantidade de ponteiros no nó deve ser a de registros + 1!");
+				goto freeUpdateBlockBuffer;
+			}
+			neighbor = (BlockOffset *) vlGet(block->offsetsList, count);
+			if (!m_Handler->getStorage()->writeNumber((*neighbor), &p)) {
+				perror("Erro escrever o ponteiro para o nodo da direita!");
+				goto freeUpdateBlockBuffer;
+			}
 		}
 	}
 

@@ -346,10 +346,8 @@ ObjectCursorType * vogal_definition::openTable(char * tableName) {
 	DBUG_ENTER("vogal_definition::openTable");
 
 	// Auxiliares
-	int i;
-	int ret = false;
+	int ret = false
 	
-	CursorType * colsCursor = NULL;
 	FilterCursorType * objsFilter = NULL;
 	FilterCursorType * colsFilter = NULL;
 
@@ -401,7 +399,7 @@ ObjectCursorType * vogal_definition::openTable(char * tableName) {
 		table->colsList = vlNew(true);
 		if (!table->colsList)
 			goto freeOpenTable;
-		for (i = 0; i < C_OBJECTS_COLS_COUNT; i++) {
+		for (int i = 0; i < C_OBJECTS_COLS_COUNT; i++) {
 			ColumnCursorType * column = new ColumnCursorType(i);
 			column->name = cols[i];
 			column->type = vogal_utils::str2type(types[i]);
@@ -528,6 +526,185 @@ int vogal_definition::newTable(char* name, PairListRoot * columns){
 	DBUG_RETURN(tableCreated); 
 }
 
+int vogal_definition::dropTable(char* name) {
+	DBUG_ENTER("vogal_definition::dropTable");
+
+	int ret = false;
+
+	CursorType * 	   cursor = NULL;
+	ObjectCursorType * table = NULL;
+	FilterCursorType * filter = NULL;
+	FilterCursorType * objsFilter = NULL;
+	FilterCursorType * colsFilter = NULL;
+	BlockOffset		   * blockAux;
+	ValueListRoot	   * blockStack = NULL;
+	LinkedListRootType * blocksToRemove = NULL;
+	BlockCursorType * blockCur = NULL;
+	GenericPointer	  buffer = NULL;
+
+	// Se está tentando remover a tabela de colunas ou objetos
+	if (!(strcmp(name,C_COLUMNS) + strcmp(name,C_OBJECTS))) {
+		perror("Impossível remover tabelas do metadados!");
+		goto freeDropTable;
+	}
+
+	// Verifica se a tabela existe
+    table = openTable(name); 
+	if (!table) {
+		perror("Tabela não encontrada!");
+		goto freeDropTable;
+	}
+	
+	// Varre os blocos para ver quais podem ser liberados
+
+	// Primeiro os raiz
+	blockStack = vlNew();
+
+	// Da tabela
+	blockAux = new BlockOffset();
+	(*blockAux) = table->block->id;
+	vlAdd(blockStack, blockAux);
+
+	// Das colunas
+	for (int c = 0; c < vlCount(table->colsList); c++) {
+		ColumnCursorType * column = (ColumnCursorType *) vlGet(table->colsList, c);
+		blockAux = new BlockOffset();
+		(*blockAux) = column->block->id;
+		vlAdd(blockStack, blockAux);
+	}
+
+	// Abre cursor
+	cursor = m_Handler->getManipulation()->openCursor(table);
+	if (!cursor) {
+		perror("Impossível abrir cursor da tabela!");
+		goto freeDropTable;
+	}
+
+	// Agora faz uma varredura nos blocos para ver ramificações
+	// Obs.: Nunca ocorrerá loop infinito pois nenhum bloco tem dois pais.
+	blockToRemove = llNew();
+	for (int i = 0; i < vlCount(blockStack); i++) {
+		blockAux = (BlockOffset *) vlGet(blockStack, i);
+		llPut(blockToRemove, (*blockAux));
+		// Divide e adiciona à pilha
+		if (blockCur)
+			blockCur->~BlockCursorType();
+		blockCur = m_Handler->getStorage()->openBlock((*blockAux))
+		if (!blockCur) {
+			perror("Erro ao abrir bloco para limpeza!");
+			goto freeDropTable;
+		}
+		if (!parseBlock(cursor, NULL, blockCur)) {
+			perror("Erro ao efetuar o parse do bloco para limpeza!");
+			goto freeDropTable;
+		}
+		for (int io = 0; io < vlCount(blockCur->offsetsList); io++) {
+			blockAux = (BlockOffset *) vlGet(blockCur->offsetsList, io);
+			if (blockAux) {
+				BlockOffset temp = (*blockAux);
+				blockAux = new BlockOffset();
+				(*blockAux) = temp;
+				vlAdd(blockStack, blockAux);
+			}
+		}
+	}
+
+	// Agora invalida todos os blocos encontrados
+	buffer = vogal_utils::blankBuffer(); // Valid = false
+	while (llPop(blocksToRemove, &blockAux)) {
+		m_Handler->getStorage()->writeOnBlock(buffer, (*blockAux));
+	}
+
+	// Tudo limpo agora exclui do metadados...
+
+	// Cria objeto de filtro
+	objsFilter = new FilterCursorType();
+	objsFilter->cursor = m_Handler->getManipulation()->openCursor(m_Handler->getCache()->openObjects());
+
+	// Senão, deve obter através das tabelas do dicionário de dados
+	if (!objsFilter->cursor || !objsFilter->cursor->table) {
+		perror("Impossível abrir cursor dos objetos!");
+		goto freeOpenTable;
+	}
+
+	objsFilter->data = new DataCursorType();
+	objsFilter->data->content = (GenericPointer) name;
+	objsFilter->data->usedSize = strlen(name);
+	objsFilter->data->allocSize = objsFilter->data->usedSize + 1;
+	objsFilter->data->contentOwner = false;
+
+	objsFilter->data->column = findColumn(objsFilter->cursor->table, C_NAME_KEY);
+	if (!objsFilter->data->column) {
+		perror("Coluna do metadados correspondente ao nome da tabela não pode ser encontrada!");
+		goto freeOpenTable;
+	}
+
+	// Procura a tabela	
+	if (!m_Handler->getManipulation()->fetch(objsFilter)) {
+		DBUG_PRINT("INFO", ("Tabela não encontrada!"));
+		goto freeOpenTable;
+	}
+	
+	// Obtém as colunas da tablea
+	colsFilter = new FilterCursorType();
+	colsFilter->cursor = m_Handler->getManipulation()->openCursor(m_Handler->getCache()->openColumns());
+
+	if (!colsFilter->cursor || !colsFilter->cursor->table) {
+		perror("Impossível abrir cursor das colunas!");
+		goto freeOpenTable;
+	}
+
+	colsFilter->data = new DataCursorType();
+	colsFilter->data->content = (GenericPointer) objsFilter->fetch->id;
+	colsFilter->data->usedSize = sizeof(BigNumber);
+	colsFilter->data->allocSize = colsFilter->data->usedSize;
+	colsFilter->data->contentOwner = false;
+
+	colsFilter->data->column = findColumn(colsFilter->cursor->table, C_TABLE_RID_KEY);
+	if (!colsFilter->data->column) {
+		perror("Coluna do metadados correspondente ao RID da tabela não pode ser encontrada!");
+		goto freeOpenTable;
+	}
+
+	// Remove os dados da tabela
+	
+	
+	// Varre as colunas da tabela
+	// TODO: Melhorar para excluir tudo e só depois gravar no arquivão
+	// 		 e para o fetch não trazer os dados na exclusão
+	while (m_Handler->getManipulation()->fetch(colsFilter)) {
+		if (!m_Handler->getManipulation()->removeFetch(colsFilter)) {
+			perror("Erro ao excluir colunas da tabela!");
+			goto freeDropTable;
+		}
+	}
+
+	if (!m_Handler->getManipulation()->removeFetch(objsFilter)) {
+		perror("Erro ao excluir a tabela!");
+		goto freeDropTable;
+	}
+
+	ret = true;
+
+freeDropTable:
+	if (objsFilter)
+		objsFilter->~FilterCursorType();
+	if (colsFilter)
+		colsFilter->~FilterCursorType();
+	if (table)
+		table->~ObjectCursorType();
+	if (cursor)
+		cursor->~CursorType();
+	if (blockCur)
+		blockCur->~BlockCursorType();
+	if (blockStack)
+		vlFree(blocks);
+	if (blocksToRemove)
+		llFree(blocksToRemove);
+	
+	DBUG_RETURN(ret);
+}
+	
 int vogal_definition::parseBlock(CursorType * cursor, ColumnCursorType * column, BlockCursorType * block) {
 	DBUG_ENTER("vogal_manipulation::parseBlock");
 	

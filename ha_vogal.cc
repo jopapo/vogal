@@ -610,30 +610,15 @@ THR_LOCK_DATA **ha_vogal::store_lock(THD *thd,
 */
 int ha_vogal::delete_table(const char *name)
 {
-  DBUG_ENTER("ha_vogal::delete_table");
-  /* This is not implemented but we want someone to be able that it works. */
-  DBUG_RETURN(0);
+	DBUG_ENTER("ha_vogal::delete_table");
+
+	if (!vogal->getDefinition()->dropTable(const_cast<char*>(name))) {
+		my_error(ER_CANT_REMOVE_ALL_FIELDS, MYF(0), "Erro ao remover a tabela");
+		DBUG_RETURN(HA_ERR_GENERIC);
+	}
+
+	DBUG_RETURN(0);
 }
-
-
-/**
-  @brief
-  create() is called to create a database. The variable name will have the name
-  of the table.
-
-  @details
-  When create() is called you do not need to worry about
-  opening the table. Also, the .frm file will have already been
-  created so adjusting create_info is not necessary. You can overwrite
-  the .frm file at this point if you wish to change the table
-  definition, but there are no methods currently provided for doing
-  so.
-
-  Called from handle.cc by ha_create_table().
-
-  @see
-  ha_create_table() in handle.cc
-*/
 
 int ha_vogal::create(const char *name, TABLE *table_arg,
                        HA_CREATE_INFO *create_info)
@@ -668,49 +653,6 @@ int ha_vogal::create(const char *name, TABLE *table_arg,
 
 struct st_mysql_storage_engine vogal_storage_engine =
 { MYSQL_HANDLERTON_INTERFACE_VERSION };
-	
-/*static ulong srv_enum_var= 0;
-static ulong srv_ulong_var= 0;
-
-const char *enum_var_names[]=
-{
-  "e1", "e2", NullS
-};
-
-TYPELIB enum_var_typelib=
-{
-  array_elements(enum_var_names) - 1, "enum_var_typelib",
-  enum_var_names, NULL
-};
-
-static MYSQL_SYSVAR_ENUM(
-  enum_var,                       // name
-  srv_enum_var,                   // varname
-  PLUGIN_VAR_RQCMDARG,            // opt
-  "Sample ENUM system variable.", // comment
-  NULL,                           // check
-  NULL,                           // update
-  0,                              // def
-  &enum_var_typelib);             // typelib
-
-static MYSQL_SYSVAR_ULONG (
-  ulong_var,
-  srv_ulong_var,
-  PLUGIN_VAR_RQCMDARG,
-  "0..1000",
-  NULL,
-  NULL,
-  8,
-  0,
-  1000,
-  0);
-
-static struct st_mysql_sys_var* vogal_system_variables[]= {
-  MYSQL_SYSVAR(enum_var),
-  MYSQL_SYSVAR(ulong_var),
-  NULL
-};
-*/
 
 mysql_declare_plugin(vogal)
 {
@@ -722,9 +664,9 @@ mysql_declare_plugin(vogal)
   PLUGIN_LICENSE_GPL,
   vogal_init_func,                            /* Plugin Init */
   vogal_done_func,                            /* Plugin Deinit */
-  0x0001 				      /* 0.1 */,
+  0x0001, 				      				  /* 0.1 */
   NULL,                                       /* status variables */
-  NULL, //vogal_system_variables,                     /* system variables */
+  NULL,                      				  /* system variables */
   NULL                                        /* config options */
 }
 mysql_declare_plugin_end;

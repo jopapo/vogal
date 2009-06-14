@@ -9,10 +9,10 @@ vogal_handler::vogal_handler(){
 	m_Definition = new vogal_definition(this);
 	m_Manipulation = new vogal_manipulation(this);
 
-	printf("INICIALIZANDO STORAGE ENFINE VOGAL!\n");
+	printf("INICIALIZANDO STORAGE ENGINE VOGAL!\n");
 	if (!ensureSanity())
 		my_error(ER_UNKNOWN_ERROR, MYF(0), "Erro ao testar a sanidade do arquivo de dados!");
-	printf("STORAGE ENFINE VOGAL INICIALIZADO!\n");
+	printf("STORAGE ENGINE VOGAL INICIALIZADO!\n");
 
 	DBUG_LEAVE;
 }
