@@ -14,24 +14,6 @@ vogal_manipulation::~vogal_manipulation(){
 	DBUG_LEAVE;
 }
 
-ColumnCursorType * vogal_manipulation::findColumn(CursorType* cursor, char * colName) {
-	DBUG_ENTER("vogal_manipulation::findColumn");
-	if (!cursor) {
-		perror("Impossível obter uma coluna de nenhum cursor!");
-		DBUG_RETURN(NULL);
-	}
-	if (!cursor->table) {
-		perror("Impossível obter uma coluna de nenhuma tabela!");
-		DBUG_RETURN(NULL);
-	}
-	for (int i = 0; i < vlCount(cursor->table->colsList); i++) {
-		ColumnCursorType * col = (ColumnCursorType *) vlGet(cursor->table->colsList, i);
-		if (!strcmp(col->name, colName))
-			DBUG_RETURN(col);
-	}
-	DBUG_RETURN(NULL);
-}
-
 ValueListRoot * vogal_manipulation::createObjectData(CursorType * cursor, char* name, char* type, BlockOffset location) {
 	DBUG_ENTER("vogal_manipulation::createObjectData");
 	
@@ -39,7 +21,7 @@ ValueListRoot * vogal_manipulation::createObjectData(CursorType * cursor, char* 
 	ValueListRoot *dataList = vlNew(true);
 
 	data = new DataCursorType();
-	data->column = findColumn(cursor, C_NAME_KEY);
+	data->column = m_Handler->getDefinition()->findColumn(cursor->table, C_NAME_KEY);
 	if (!data->column)
 		goto freeCreateObjectData;
 	data->usedSize = strlen(name);
@@ -49,7 +31,7 @@ ValueListRoot * vogal_manipulation::createObjectData(CursorType * cursor, char* 
 		goto freeCreateObjectData;
 
 	data = new DataCursorType();
-	data->column = findColumn(cursor, C_TYPE_KEY);
+	data->column = m_Handler->getDefinition()->findColumn(cursor->table, C_TYPE_KEY);
 	if (!data->column)
 		goto freeCreateObjectData;
 	data->content = (GenericPointer) type;
@@ -59,7 +41,7 @@ ValueListRoot * vogal_manipulation::createObjectData(CursorType * cursor, char* 
 		goto freeCreateObjectData;
 
 	data = new DataCursorType();
-	data->column = findColumn(cursor, C_LOCATION_KEY);
+	data->column = m_Handler->getDefinition()->findColumn(cursor->table, C_LOCATION_KEY);
 	if (!data->column)
 		goto freeCreateObjectData;
 	data->content = (GenericPointer) &location;
@@ -85,7 +67,7 @@ ValueListRoot * vogal_manipulation::createColumnData(CursorType * cursor, BigNum
 	ValueListRoot * dataList = vlNew(true);
 
 	data = new DataCursorType();
-	data->column = findColumn(cursor, C_TABLE_RID_KEY);
+	data->column = m_Handler->getDefinition()->findColumn(cursor->table, C_TABLE_RID_KEY);
 	if (!data->column)
 		goto freeCreateColumnData;
 	data->content = (GenericPointer) &tableRid;
@@ -95,7 +77,7 @@ ValueListRoot * vogal_manipulation::createColumnData(CursorType * cursor, BigNum
 		goto freeCreateColumnData;
 
 	data = new DataCursorType();
-	data->column = findColumn(cursor, C_NAME_KEY);
+	data->column = m_Handler->getDefinition()->findColumn(cursor->table, C_NAME_KEY);
 	if (!data->column)
 		goto freeCreateColumnData;
 	data->usedSize = strlen(name);
@@ -105,7 +87,7 @@ ValueListRoot * vogal_manipulation::createColumnData(CursorType * cursor, BigNum
 		goto freeCreateColumnData;
 
 	data = new DataCursorType();
-	data->column = findColumn(cursor, C_TYPE_KEY);
+	data->column = m_Handler->getDefinition()->findColumn(cursor->table, C_TYPE_KEY);
 	if (!data->column)
 		goto freeCreateColumnData;
 	data->content = (GenericPointer) type;
@@ -115,7 +97,7 @@ ValueListRoot * vogal_manipulation::createColumnData(CursorType * cursor, BigNum
 		goto freeCreateColumnData;
 
 	data = new DataCursorType();
-	data->column = findColumn(cursor, C_LOCATION_KEY);
+	data->column = m_Handler->getDefinition()->findColumn(cursor->table, C_LOCATION_KEY);
 	if (!data->column)
 		goto freeCreateColumnData;
 	data->content = (GenericPointer) &location;
@@ -182,18 +164,18 @@ freeInsertData:
 	DBUG_RETURN(0);
 }
 
-CursorType * vogal_manipulation::openCursor(ObjectCursorType * object, PairListRoot * filter){
+CursorType * vogal_manipulation::openCursor(ObjectCursorType * object){
 	DBUG_ENTER("vogal_manipulation::openCursor");
 
 	int ret = false;
 
 	CursorType *cursor = new CursorType();
 	cursor->table = object;
-	cursor->filter = filter;
-	cursor->hasMore = true;
-	
-	if (!cursor->table || !cursor->table->block)
+
+	if (!cursor->table || !cursor->table->block) {
+		perror("Informações incompletas para definição do cursor!");
 		goto freeOpenCursor;
+	}
 	
 	ret = true;
 
@@ -527,6 +509,8 @@ int vogal_manipulation::updateLocation(CursorType * cursor, NodeType * node, Blo
 		data->blockId = blockId;
 		data->blockOffset = blockOffset;
 
+		// TODO: CUIDADO!!! Nunca encher muito o bloco pois na atualização do deslocamento normalmente se ocupam mais ou menos blocos na
+		//		hora de escrevê-lo. Portanto, nunca encher o bloco por completo
 		if (!updateBlockBuffer(info->findedBlock)) {
 			perror("Erro ao atualizar buffer da coluna com deslocamento");
 			goto freeUpdateLocation;
@@ -702,190 +686,76 @@ freeWriteRid:
 	DBUG_RETURN(ret);
 }
 
-int vogal_manipulation::fetch(CursorType * cursor){
-	// Aqui está acessando direto o disco - Ajustar para obter da memória 
-	DBUG_ENTER("vogal_manipulation::fetch");
+
+int vogal_manipulation::fillDataFromLocation(CursorType * cursor, DataCursorType * data) {
+	DBUG_ENTER("vogal_manipulation::fillDataFromLocation");
 
 	int ret = false;
-	/*int validFetch = false; 
-	
-	if (!cursor->hasMore) {
-		perror("Não há mais dados");
-		goto freeFetch; 
+	BlockCursorType * block = NULL;
+	NodeType * node;
+
+	// Abre o bloco do dado
+	block = m_Handler->getStorage()->openBlock(data->blockId);
+	if (!block) {
+		perror("Erro ao abrir bloco para carregar dado da coluna!");
+		goto freeFillDataFromLocation;
 	}
 
-	cursor->fetch = readRid(cursor);
-	while (cursor->fetch) {
-		// Valido?
-		validFetch = true; // True pois se não houver filtro, o primeiro registro é válido
-		
-		// Processo de comparação por todos os campos do filtro
-		StringTreeNode* iNode = NULL;
-		StringTreeIterator* iter = NULL;
-		if (cursor->filter)
-			iter = stCreateIterator(cursor->filter, &iNode);
-		while (iNode) {
-			// Obtenção de informações
-			TreeNodeValue value;
-			ColumnCursorType * column;
-			DataCursorType * data;
-			int comparison;
-			
-			if (!stGet(cursor->table->colsList, stNodeName(iNode), &value))
-				goto freeFetch;    
-			column = (ColumnCursorType *) value;
-			if (!stGet(cursor->fetch->dataList, (char*) stNodeName(iNode), &value))
-				goto freeFetch;    
-			data = (DataCursorType *) value;
+	if (!m_Handler->getDefinition()->parseBlock(cursor, data->column, block)) {
+		perror("Erro ao efetuar o parse ao carregar dado da coluna!");
+		goto freeFillDataFromLocation;
+	}
 
-			// Comparação
-			switch (column->type) {
-				case NUMBER:
-					comparison = (BigNumber*)data->content - (BigNumber*) stNodeValue(iNode);
-					break;
-				case VARCHAR:
-					// Comparação
-					comparison = memcmp(data->content, stNodeValue(iNode), MIN(data->allocSize, strlen((char*)stNodeValue(iNode))));
-					break;
-				default:
-					perror("Comparação não preparada para o tipo!");
-					goto freeFetch;
-			}
-			if (comparison) {
-				validFetch = false;
-				break;
-			}
-	
-			iNode = stNext(iter);
-		}
-		stFreeIterator(iter);
-		
-		if (validFetch) {
-			cursor->rowCount ++;
-			break;
-		}
-		
-		// Limpa RID anterior
-		freeRid(cursor->fetch);
-		// Executa novo fetch
-		cursor->fetch = readRid(cursor);
-		
+	node = (NodeType *) vlGet(block->nodesList, data->blockOffset);
+	if (!node) {
+		perror("Erro ao localizar nodo específico do dado da coluna!");
+		goto freeFillDataFromLocation;
 	}
+
+	// Transferencia de paternidade:
+	node->dataOwner = false;
+
+	data->content = node->data->content;
+	data->usedSize = node->data->usedSize;
+	data->allocSize = node->data->allocSize;
 	
-	if (validFetch) {
-		ret = true;
-	} else {
-		cursor->hasMore = false;
-	}
-	
-freeFetch:*/
+	ret = true;
+
+freeFillDataFromLocation:
+	if (block)
+		block->~BlockCursorType();
 
 	DBUG_RETURN(ret);
 }
 
-RidCursorType * vogal_manipulation::readRid(CursorType * cursor){
-	DBUG_ENTER("vogal_manipulation::readRid");
+int vogal_manipulation::fetch(FilterCursorType * filter){
+	// Aqui está acessando direto o disco - Ajustar para obter da memória 
+	DBUG_ENTER("vogal_manipulation::fetch");
 
-	/*int ret = false;
-	BigNumber fieldCount;
+	int ret = false;
 
-	GenericPointer p = cursor->offset;
+	// ######################
+	// TÁ COM PAU!!!
+	// ######################
 	
-	RidCursorType * rid = new RidCursorType();
-	rid->dataList = NULL;
-	
-	// Cria objeto RID
-	if (!m_Handler->getStorage()->readSizedNumber(&p, &rid->rid))
-		goto freeReadRid;
+	if (!filter->opened) {
+		// Obtém o rid do dado a ser localizado
+		filter->infoData = findNearest(filter->cursor, NULL, filter->data, filter->column->block);
+
+		// Obtém as localizações de todos os dados do rid localizado
+		filter->infoFetch = findNearest(filter->cursor, filter->infoData->findedNode->rid, NULL, filter->cursor->table->block);
+
+		// Por enquanto obtém todas as colunas
+		// TODO: Pegar somente as colunas solicitadas
+		for (int d = 0; d < vlCount(filter->infoFetch->findedNode->rid->dataList); d++)
+			fillDataFromLocation(filter->cursor, (DataCursorType*) vlGet(filter->infoFetch->findedNode->rid->dataList, d));
 		
-	// Os RIDs devem iniciar de 1, caso seja zero é que os registros acabaram
-	if (!rid->rid) {
-		goto freeReadRid;
+		filter->fetch = filter->infoFetch->findedNode->rid;
+
+		filter->opened = true;
 	}
-	
-	rid->dataList = stNew(FALSE, TRUE); 
-	
-	if (!m_Handler->getStorage()->readDataSize(&p, &fieldCount))
-		goto freeReadRid;
-	
-	for (; fieldCount > 0; fieldCount--) {
-		// Obtém o ID da coluna
-		BigNumber colId;
-		// Procura a coluna com determinado ID
-		ColumnCursorType * column = NULL;
-		StringTreeNode * iNode;
-		StringTreeIterator * iter;
-		BigNumber colDataSize;			
-		DataCursorType * data;
-
-
-		if (!m_Handler->getStorage()->readDataSize(&p, &colId))
-			goto freeReadRid;
-
 		
-		iNode = NULL;
-		iter = stCreateIterator(cursor->table->colsList, &iNode);
-		while (iNode) {
-			column = (ColumnCursorType*) stNodeValue(iNode);
-			if (column->id == colId) 
-				break;
-			iNode = stNext(iter);
-		}
-		stFreeIterator(iter);
-		
-		if (!iNode)
-			goto freeReadRid;
+freeFetch:
 
-		// Obtém tamanho do dado
-		if (!m_Handler->getStorage()->readDataSize(&p, &colDataSize)) {
-			perror("Erro ao ler o tamanho do dado!");
-			goto freeReadRid;
-		}
-		if (!colDataSize) {
-			// Aqui deveria gerar erro por registros nulos nem serem gravados, porém em caso de atualização isso pode acontecer (supostamente)
-			continue;
-		}
-
-		// Achou a coluna portanto, carrega conforme seu tipo
-		data = (DataCursorType*) malloc(sizeof(DataCursorType));
-		data->content = NULL;
-		
-		// Adiciona a lista de dados dos fetch 
-		stPut(rid->dataList, column->name, data);
-		
-		// Carga e alocação dos dados
-		switch (column->type) {
-			case NUMBER:
-				data->allocSize = sizeof(BigNumber); // Sempre é númeral máximo tratado, no caso LONG LONG INT (64BITS)  
-				data->content = (GenericPointer) malloc(data->allocSize);
-				memset(data->content, 0x00, data->allocSize);
-				break;
-			case VARCHAR:
-				// Tamanho máximo permitido até o momento
-				data->allocSize = colDataSize;
-				data->content = (GenericPointer) malloc(data->allocSize + 1); // Mais 1 para o Null Terminated String
-				memset(data->content, 0x00, data->allocSize + 1);
-				break;
-			default: // TODO (Pendência): Implementar comparação de todos os tipos de dados
-				perror("Tipo de campo ainda não implementado!");
-				goto freeReadRid;
-		}
-		if (!m_Handler->getStorage()->readData(&p, data->content, colDataSize, data->allocSize, column->type)) {
-			perror("Erro ao ler dado do bloco!");
-			goto freeReadRid;
-		}
-	}
-	
-	ret = true;
-	
-freeReadRid:
-	if (!ret) {
-		freeRid(rid);
-		rid = NULL;
-	}
-	if (ret)
-		cursor->offset = p;
-
-	DBUG_RETURN(rid);*/
-	DBUG_RETURN(NULL);
+	DBUG_RETURN(ret);
 }

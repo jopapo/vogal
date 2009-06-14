@@ -6,10 +6,6 @@ CursorType::CursorType() {
 	DBUG_ENTER("CursorType::CursorType");
 	
 	table = NULL;
-	fetch = NULL;
-	filter = NULL;
-	rowCount = 0;
-	hasMore = false;
 	lastRid = 0;
 	
 	DBUG_LEAVE;
@@ -23,11 +19,6 @@ CursorType::~CursorType() {
 		table->~ObjectCursorType();
 		table = NULL;
 	}
-	if (fetch) {
-		fetch->~RidCursorType();
-		fetch = NULL;
-	}
-	plFree(&filter);
 
 	DBUG_LEAVE;
 }

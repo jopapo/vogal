@@ -23,6 +23,7 @@ public:
 	int parseBlock(CursorType * cursor, ColumnCursorType * column, BlockCursorType * block);
 
 	int newTable(char* name, PairListRoot * columns);
+	ColumnCursorType * findColumn(ObjectCursorType* table, char * colName);
 
 private:
 	vogal_handler *m_Handler;

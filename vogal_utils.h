@@ -47,6 +47,7 @@
 
 // ### SUBTIPOS ###
 typedef enum {NUMBER,FLOAT,DATE,VARCHAR,UNKNOWN} DataTypes;
+typedef enum {EQ,BG,BGE,SM,SME,NONE} FilterTypes;
 
 typedef unsigned long long int BigNumber;
 typedef unsigned char * GenericPointer;

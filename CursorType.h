@@ -4,7 +4,6 @@
 
 #include "vogal_utils.h"
 #include "ObjectCursorType.h"
-#include "RidCursorType.h"
 
 class CursorType {
 
@@ -13,11 +12,7 @@ public:
 	virtual ~CursorType();
 
 	ObjectCursorType *table;
-	RidCursorType 	 *fetch;
-	PairListRoot 	 *filter; 
-	BigNumber		  rowCount;
 	BigNumber		  lastRid;
-	int				  hasMore;
 	
 };
 
