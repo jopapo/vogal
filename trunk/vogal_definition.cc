@@ -193,7 +193,7 @@ CursorType * vogal_definition::createTableStructure(char *name, PairListRoot *co
 	}
 
 	// Atualiza estrutura
-	if (!m_Handler->getManipulation()->updateBlockBuffer(cursor->table->block)) {
+	if (!m_Handler->getManipulation()->updateBlockBuffer(cursor, cursor->table->block)) {
 		perror("Erro ao atualizar estrutura da tabla!");
 		goto freeCreateTableStructure;
 	}
@@ -228,7 +228,7 @@ CursorType * vogal_definition::createTableStructure(char *name, PairListRoot *co
 			perror("Erro ao criar estrutura da coluna!");
 			goto freeCreateTableStructure;
 		}
-		if (!m_Handler->getManipulation()->updateBlockBuffer(col->block)) {
+		if (!m_Handler->getManipulation()->updateBlockBuffer(cursor, col->block)) {
 			perror("Erro ao atualizar estrutura da coluna!");
 			goto freeCreateTableStructure;
 		}
@@ -346,7 +346,7 @@ ObjectCursorType * vogal_definition::openTable(char * tableName) {
 	DBUG_ENTER("vogal_definition::openTable");
 
 	// Auxiliares
-	int ret = false
+	int ret = false;
 	
 	FilterCursorType * objsFilter = NULL;
 	FilterCursorType * colsFilter = NULL;
@@ -370,7 +370,7 @@ ObjectCursorType * vogal_definition::openTable(char * tableName) {
 			perror("Erro ao criar lista de colunas!");
 			goto freeOpenTable;
 		}
-		for (i = 0; i < C_COLUMNS_COLS_COUNT; i++) {
+		for (int i = 0; i < C_COLUMNS_COLS_COUNT; i++) {
 			ColumnCursorType * column = new ColumnCursorType(i);
 			column->name = cols[i+C_OBJECTS_COLS_COUNT];
 			column->type = vogal_utils::str2type(types[i+C_OBJECTS_COLS_COUNT]);
@@ -558,7 +558,7 @@ int vogal_definition::dropTable(char* name) {
 	// Varre os blocos para ver quais podem ser liberados
 
 	// Primeiro os raiz
-	blockStack = vlNew();
+	blockStack = vlNew(true);
 
 	// Da tabela
 	blockAux = new BlockOffset();
@@ -582,14 +582,14 @@ int vogal_definition::dropTable(char* name) {
 
 	// Agora faz uma varredura nos blocos para ver ramificações
 	// Obs.: Nunca ocorrerá loop infinito pois nenhum bloco tem dois pais.
-	blockToRemove = llNew();
+	blocksToRemove = llNew();
 	for (int i = 0; i < vlCount(blockStack); i++) {
 		blockAux = (BlockOffset *) vlGet(blockStack, i);
-		llPut(blockToRemove, (*blockAux));
+		llPush(blocksToRemove, (*blockAux));
 		// Divide e adiciona à pilha
 		if (blockCur)
 			blockCur->~BlockCursorType();
-		blockCur = m_Handler->getStorage()->openBlock((*blockAux))
+		blockCur = m_Handler->getStorage()->openBlock((*blockAux));
 		if (!blockCur) {
 			perror("Erro ao abrir bloco para limpeza!");
 			goto freeDropTable;
@@ -610,10 +610,16 @@ int vogal_definition::dropTable(char* name) {
 	}
 
 	// Agora invalida todos os blocos encontrados
-	buffer = vogal_utils::blankBuffer(); // Valid = false
-	while (llPop(blocksToRemove, &blockAux)) {
-		m_Handler->getStorage()->writeOnBlock(buffer, (*blockAux));
+	buffer = vogal_cache::blankBuffer(); // Valid = false
+	blockAux = new BlockOffset();
+	while (llPop(blocksToRemove, blockAux)) {
+		if (!m_Handler->getStorage()->writeOnBlock(buffer, (*blockAux))) {
+			perror("Erro ao esvaziar bloco!");
+			free(blockAux);
+			goto freeDropTable;
+		}
 	}
+	free(blockAux);
 
 	// Tudo limpo agora exclui do metadados...
 
@@ -624,7 +630,7 @@ int vogal_definition::dropTable(char* name) {
 	// Senão, deve obter através das tabelas do dicionário de dados
 	if (!objsFilter->cursor || !objsFilter->cursor->table) {
 		perror("Impossível abrir cursor dos objetos!");
-		goto freeOpenTable;
+		goto freeDropTable;
 	}
 
 	objsFilter->data = new DataCursorType();
@@ -636,13 +642,13 @@ int vogal_definition::dropTable(char* name) {
 	objsFilter->data->column = findColumn(objsFilter->cursor->table, C_NAME_KEY);
 	if (!objsFilter->data->column) {
 		perror("Coluna do metadados correspondente ao nome da tabela não pode ser encontrada!");
-		goto freeOpenTable;
+		goto freeDropTable;
 	}
 
 	// Procura a tabela	
 	if (!m_Handler->getManipulation()->fetch(objsFilter)) {
 		DBUG_PRINT("INFO", ("Tabela não encontrada!"));
-		goto freeOpenTable;
+		goto freeDropTable;
 	}
 	
 	// Obtém as colunas da tablea
@@ -651,7 +657,7 @@ int vogal_definition::dropTable(char* name) {
 
 	if (!colsFilter->cursor || !colsFilter->cursor->table) {
 		perror("Impossível abrir cursor das colunas!");
-		goto freeOpenTable;
+		goto freeDropTable;
 	}
 
 	colsFilter->data = new DataCursorType();
@@ -663,7 +669,7 @@ int vogal_definition::dropTable(char* name) {
 	colsFilter->data->column = findColumn(colsFilter->cursor->table, C_TABLE_RID_KEY);
 	if (!colsFilter->data->column) {
 		perror("Coluna do metadados correspondente ao RID da tabela não pode ser encontrada!");
-		goto freeOpenTable;
+		goto freeDropTable;
 	}
 
 	// Remove os dados da tabela
@@ -698,9 +704,9 @@ freeDropTable:
 	if (blockCur)
 		blockCur->~BlockCursorType();
 	if (blockStack)
-		vlFree(blocks);
+		vlFree(&blockStack);
 	if (blocksToRemove)
-		llFree(blocksToRemove);
+		llFree(&blocksToRemove);
 	
 	DBUG_RETURN(ret);
 }
