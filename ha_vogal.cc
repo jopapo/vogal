@@ -613,7 +613,7 @@ int ha_vogal::delete_table(const char *name)
 	DBUG_ENTER("ha_vogal::delete_table");
 
 	if (!vogal->getDefinition()->dropTable(const_cast<char*>(name))) {
-		my_error(ER_CANT_REMOVE_ALL_FIELDS, MYF(0), "Erro ao remover a tabela");
+		my_error(ER_NO, MYF(0), "Erro ao remover a tabela");
 		DBUG_RETURN(HA_ERR_GENERIC);
 	}
 

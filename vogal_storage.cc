@@ -187,7 +187,7 @@ BlockCursorType * vogal_storage::openBlock(BlockOffset id){
 
 	GenericPointer buffer = vogal_cache::blankBuffer(); 
 	if (!readBlock(id, buffer)) {
-		perror("Erro ao ler bloco!");
+		ERROR( "Erro ao ler bloco!");
 		goto free;
 	}
 	
@@ -208,7 +208,7 @@ int vogal_storage::readSizedNumber(GenericPointer* src, BigNumber* number){
 	
 	BigNumber dataBytes;
 	if (!readDataSize(src, &dataBytes)) {
-		perror("Erro ao ler o tamanho do número!");
+		ERROR( "Erro ao ler o tamanho do número!");
 		DBUG_RETURN(false);
 	}
 	
@@ -242,7 +242,7 @@ int vogal_storage::readData(GenericPointer* src, GenericPointer dest, BigNumber 
 	
 	// dataType será relevante por causa da redução que se dá ao gravar (O retorno pode variar)
 	if (destSize < dataBytes) {
-		perror("Espaço disponível para alocação insuficiente para o campo!");
+		ERROR( "Espaço disponível para alocação insuficiente para o campo!");
 		DBUG_RETURN(false);
 	}
 	memcpy(dest, (*src), dataBytes);
@@ -256,7 +256,7 @@ int vogal_storage::skipData(GenericPointer* src){
 
 	BigNumber dataBytes;
 	if (!readDataSize(src, &dataBytes)) {
-		perror("Erro ao ler o tamanho do número!");
+		ERROR( "Erro ao ler o tamanho do número!");
 		DBUG_RETURN(false);
 	}
 	(*src)+=dataBytes;
@@ -296,7 +296,7 @@ int vogal_storage::writeAnyData(GenericPointer* dest, GenericPointer src, DataTy
 			DBUG_RETURN( writeNumber((*(BigNumber*)src), dest) );
 	}
 
-	perror("Tipo ainda não implementado");
+	ERROR( "Tipo ainda não implementado");
 	DBUG_RETURN(false);
 }
 
