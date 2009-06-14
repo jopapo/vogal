@@ -69,19 +69,19 @@ int vogal_handler::ensureSanity() {
 		if (getStorage()->initialize()) {
 			newDatabase = true;
 		} else {
-			perror("Erro ao criar DB");
+			ERROR( "Erro ao criar DB");
 			DBUG_RETURN(false);
 		}
 	}
 	
 	if (!getCache()->bufferize()) {
-		perror("Erro ao bufferizar DB");
+		ERROR( "Erro ao bufferizar DB");
 		DBUG_RETURN(false);
 	}
 
 	if (newDatabase)
 		if (!getDefinition()->createDataDictionary()) {
-			perror("Erro ao criar dicionário de dados");
+			ERROR( "Erro ao criar dicionário de dados");
 			DBUG_RETURN(false);
 		}
 		

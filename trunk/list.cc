@@ -8,6 +8,7 @@
 
 #include "list.h"
 #include <my_global.h>
+#include "vogal_utils.h"
 
 // ### RANGE LIST IMPLEMENATION ###
 
@@ -284,9 +285,9 @@ int llDump(LinkedListRootType* root) {
 
 ValueListRoot* vlNew(bool owner) {
 	DBUG_ENTER("vlNew");
-	ValueListRoot * root = (ValueListRoot *) malloc(sizeof(ValueListRoot));
-	root->root = (ListValueType*) malloc(C_VL_GROW_FACTOR * sizeof(ListValueType*));
-	root->space = C_VL_GROW_FACTOR;
+	ValueListRoot * root = new ValueListRoot();
+	root->root = NULL;
+	root->space = 0;
 	root->count = 0;
 	root->owner = owner;
 	DBUG_RETURN(root);
@@ -296,10 +297,12 @@ int vlFree(ValueListRoot** root) {
 	DBUG_ENTER("vlFree");
 	if (!(*root))
 		DBUG_RETURN(true);
-	if ((*root)->owner)
-		for (int i = 0; i < (*root)->count; i++)
-			free((*root)->root[i]);
-	free((*root)->root);
+	if ((*root)->root) {
+		if ((*root)->owner)
+			for (int i = 0; i < (*root)->count; i++)
+				free((*root)->root[i]);
+		free((*root)->root);
+	}
 	free((*root));
 	(*root) = NULL;
 	DBUG_RETURN(true);
@@ -309,8 +312,11 @@ int vlGrow(ValueListRoot* root) {
 	DBUG_ENTER("vlGrow");
 	// Se é necessário crescer
 	if (root->count >= root->space) {
-		root->root = (ListValueType*) realloc(root->root, sizeof(root->root) + (C_VL_GROW_FACTOR * sizeof(ListValueType*)));
 		root->space += C_VL_GROW_FACTOR;
+		if (!root->root)
+			root->root = (ListValueType*) malloc(root->space * sizeof(ListValueType*));
+		else
+			root->root = (ListValueType*) realloc(root->root, root->space * sizeof(ListValueType*));
 	}
 	DBUG_RETURN(true);	
 }
@@ -327,7 +333,7 @@ int vlAdd(ValueListRoot* root, ListValueType value) {
 int vlInsert(ValueListRoot* root, ListValueType value, int index) {
 	DBUG_ENTER("vlInsert");
 	if (index < 0) {
-		perror("Index inválido!");
+		ERROR( "Index inválido!");
 		DBUG_RETURN(false);
 	}
 	if (!vlGrow(root))
@@ -352,7 +358,7 @@ ListValueType * vlGet(ValueListRoot* root, int index) {
 	DBUG_ENTER("vlGet");
 	if ((index < 0) ||
 	    (index >= root->count)) {
-		perror("Fora dos limites da lista!"); 
+		ERROR( "Fora dos limites da lista!"); 
 		DBUG_RETURN(NULL);
 	}
 	DBUG_RETURN( (ListValueType *) root->root[index] );
@@ -492,7 +498,7 @@ int stPut(StringTreeRoot* root, TreeNodeName name, TreeNodeValue value) {
 		(*node)->value = value;
 	} else {
 		if ((*node)) {
-			perror("Erro ao inserir na ramificação da árvore. Varredura incompleta!");
+			ERROR( "Erro ao inserir na ramificação da árvore. Varredura incompleta!");
 			DBUG_RETURN(false);
 		}
 		(*node) = (StringTreeNode*) malloc(sizeof(StringTreeNode));

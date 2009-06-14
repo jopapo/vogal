@@ -56,7 +56,7 @@ int vogal_definition::createDataDictionary(){
 	// Cria objeto
 	objsCursor = createTableStructure(C_OBJECTS, objsColsList);
 	if (!objsCursor) {
-		perror("Erro ao criar a estrutura da tabela OBJS do dicionário de dados!");
+		ERROR( "Erro ao criar a estrutura da tabela OBJS do dicionário de dados!");
 		goto freeCreateDataDictionary;
 	}
 
@@ -65,7 +65,7 @@ int vogal_definition::createDataDictionary(){
 	// Cria objeto
 	colsCursor = createTableStructure(C_COLUMNS, colsColsList);
 	if (!colsCursor) {
-		perror("Erro ao criar a estrutura da tabela COLS do dicionário de dados!");
+		ERROR( "Erro ao criar a estrutura da tabela COLS do dicionário de dados!");
 		goto freeCreateDataDictionary; 
 	}
 
@@ -73,12 +73,12 @@ int vogal_definition::createDataDictionary(){
 
 	dataList = m_Handler->getManipulation()->createObjectData(objsCursor, objsCursor->table->name, C_OBJECT_TYPE_TABLE, objsCursor->table->block->id);
 	if (!dataList) {
-		perror("Erro ao criar estrutura de dados da tabela OBJS");
+		ERROR( "Erro ao criar estrutura de dados da tabela OBJS");
 		goto freeCreateDataDictionary;
 	}
 	objsRid = m_Handler->getManipulation()->insertData(objsCursor, dataList);
 	if (!objsRid) {
-		perror("Erro ao inserir estrutura de dados da tabela OBJS");
+		ERROR( "Erro ao inserir estrutura de dados da tabela OBJS");
 		vlFree(&dataList); // Precisa liberar o datalist pois em caso de sucesso ele é filho do RID que é liberado posteriormente
 		goto freeCreateDataDictionary;
 	}
@@ -86,13 +86,13 @@ int vogal_definition::createDataDictionary(){
 	// Não precisa liberar o dataList pois ele vira 
 	dataList = m_Handler->getManipulation()->createObjectData(objsCursor, colsCursor->table->name, C_OBJECT_TYPE_TABLE, colsCursor->table->block->id);
 	if (!dataList) {
-		perror("Erro ao criar estrutura de dados da tabela COLS");
+		ERROR( "Erro ao criar estrutura de dados da tabela COLS");
 		vlFree(&dataList); // Precisa liberar o datalist pois em caso de sucesso ele é filho do RID que é liberado posteriormente
 		goto freeCreateDataDictionary;
 	}
 	colsRid = m_Handler->getManipulation()->insertData(objsCursor, dataList);
 	if (!colsRid) {
-		perror("Erro ao inserir estrutura de dados da tabela COLS");
+		ERROR( "Erro ao inserir estrutura de dados da tabela COLS");
 		goto freeCreateDataDictionary;
 	}
 
@@ -103,12 +103,12 @@ int vogal_definition::createDataDictionary(){
 		colAux = (ColumnCursorType *) vlGet(objsCursor->table->colsList, i);
 		dataList = m_Handler->getManipulation()->createColumnData(colsCursor, objsRid, colAux->name, vogal_utils::type2str(colAux->type), colAux->block->id);
 		if (!dataList) {
-			perror("Erro ao criar estrutura de dados da tabela COLS para colunas da OBJS");
+			ERROR( "Erro ao criar estrutura de dados da tabela COLS para colunas da OBJS");
 			goto freeCreateDataDictionary;
 		}
 		ridAux = m_Handler->getManipulation()->insertData(colsCursor, dataList);
 		if (!ridAux) {
-			perror("Erro ao inserir estrutura de dados na tabela COLS para colunas OBJS");
+			ERROR( "Erro ao inserir estrutura de dados na tabela COLS para colunas OBJS");
 			vlFree(&dataList);
 			goto freeCreateDataDictionary;
 		}
@@ -119,12 +119,12 @@ int vogal_definition::createDataDictionary(){
 		colAux = (ColumnCursorType *) vlGet(colsCursor->table->colsList, i);
 		dataList = m_Handler->getManipulation()->createColumnData(colsCursor, colsRid, colAux->name, vogal_utils::type2str(colAux->type), colAux->block->id);
 		if (!dataList) {
-			perror("Erro ao criar estrutura de dados da tabela COLS para colunas da OBJS");
+			ERROR( "Erro ao criar estrutura de dados da tabela COLS para colunas da OBJS");
 			goto freeCreateDataDictionary;
 		}
 		ridAux = m_Handler->getManipulation()->insertData(colsCursor, dataList);
 		if (!ridAux) {
-			perror("Erro ao inserir estrutura de dados na tabela COLS para colunas OBJS");
+			ERROR( "Erro ao inserir estrutura de dados na tabela COLS para colunas OBJS");
 			vlFree(&dataList);
 			goto freeCreateDataDictionary;
 		}
@@ -182,26 +182,26 @@ CursorType * vogal_definition::createTableStructure(char *name, PairListRoot *co
 		cursor->table->block->id = C_COLUMNS_BLOCK;
 		dict = true;
 	} else if (!m_Handler->getCache()->lockFreeBlock(&cursor->table->block->id)) {
-		perror("Não existem blocos disponíveis para criação da tabela!");
+		ERROR( "Não existem blocos disponíveis para criação da tabela!");
 		goto freeCreateTableStructure;
 	}
 
 	// Monta estrutura da tabela
 	if (!createStructure(C_BLOCK_TYPE_MAIN_TAB, cursor->table->block->buffer)) {
-		perror("Erro ao criar estrutura da tabela!");
+		ERROR( "Erro ao criar estrutura da tabela!");
 		goto freeCreateTableStructure;
 	}
 
 	// Atualiza estrutura
 	if (!m_Handler->getManipulation()->updateBlockBuffer(cursor, cursor->table->block)) {
-		perror("Erro ao atualizar estrutura da tabla!");
+		ERROR( "Erro ao atualizar estrutura da tabla!");
 		goto freeCreateTableStructure;
 	}
 
 	// Monta estrutura das colunas
 	cursor->table->colsList = vlNew(true);
 	if (!cursor->table->colsList) {
-		perror("Erro ao criar coleção de colunas da tabela!");
+		ERROR( "Erro ao criar coleção de colunas da tabela!");
 		goto freeCreateTableStructure;
 	}
 
@@ -217,7 +217,7 @@ CursorType * vogal_definition::createTableStructure(char *name, PairListRoot *co
 				col->block->id += C_OBJECTS_COLS_COUNT;
 		} else {
 			if (!m_Handler->getCache()->lockFreeBlock(&col->block->id)) {
-				perror("Não existem blocos disponíveis para criação das colunas da tabela!");
+				ERROR( "Não existem blocos disponíveis para criação das colunas da tabela!");
 				col->~ColumnCursorType();
 				goto freeCreateTableStructure;
 			}
@@ -225,11 +225,11 @@ CursorType * vogal_definition::createTableStructure(char *name, PairListRoot *co
 		col->block->buffer = vogal_cache::blankBuffer();
 		// Monta estrutura da coluna
 		if (!createStructure(C_BLOCK_TYPE_MAIN_COL, col->block->buffer)) {
-			perror("Erro ao criar estrutura da coluna!");
+			ERROR( "Erro ao criar estrutura da coluna!");
 			goto freeCreateTableStructure;
 		}
 		if (!m_Handler->getManipulation()->updateBlockBuffer(cursor, col->block)) {
-			perror("Erro ao atualizar estrutura da coluna!");
+			ERROR( "Erro ao atualizar estrutura da coluna!");
 			goto freeCreateTableStructure;
 		}
 		// Adiciona à lista de colunas
@@ -241,12 +241,12 @@ CursorType * vogal_definition::createTableStructure(char *name, PairListRoot *co
 		// Abre cursores dos objetos e coluns
 		objsCursor = m_Handler->getManipulation()->openCursor(m_Handler->getCache()->openObjects());
 		if (!objsCursor) {
-			perror("Erro ao abrir cursor da tabela OBJS!");
+			ERROR( "Erro ao abrir cursor da tabela OBJS!");
 			goto freeCreateTableStructure;
 		}
 		colsCursor = m_Handler->getManipulation()->openCursor(m_Handler->getCache()->openColumns());
 		if (!colsCursor) {
-			perror("Erro ao abrir cursor da tabela COLS!");
+			ERROR( "Erro ao abrir cursor da tabela COLS!");
 			goto freeCreateTableStructure;
 		}
 
@@ -275,14 +275,14 @@ CursorType * vogal_definition::createTableStructure(char *name, PairListRoot *co
 
 	// Grava tabela
 	if (!m_Handler->getStorage()->writeBlock(cursor->table->block)) {
-		perror("Erro ao gravar fisicamente o objeto na base!");
+		ERROR( "Erro ao gravar fisicamente o objeto na base!");
 		goto freeCreateTableStructure;
 	}
 	// Grava colunas
 	for (int i = 0; i < vlCount(cursor->table->colsList); i++) {
 		ColumnCursorType * col = (ColumnCursorType *) vlGet(cursor->table->colsList, i);
 		if (!m_Handler->getStorage()->writeBlock(col->block)) {
-			perror("Erro ao gravar fisicamente a coluna do objeto na base!");
+			ERROR( "Erro ao gravar fisicamente a coluna do objeto na base!");
 			goto freeCreateTableStructure;
 		}
 	}
@@ -329,7 +329,7 @@ int vogal_definition::createStructure(int type, GenericPointer buf){
 ColumnCursorType * vogal_definition::findColumn(ObjectCursorType* table, char * colName) {
 	DBUG_ENTER("vogal_definition::findColumn");
 	if (!table) {
-		perror("Impossível obter uma coluna de nenhuma tabela!");
+		ERROR( "Impossível obter uma coluna de nenhuma tabela!");
 		DBUG_RETURN(NULL);
 	}
 	for (int i = 0; i < vlCount(table->colsList); i++) {
@@ -362,12 +362,12 @@ ObjectCursorType * vogal_definition::openTable(char * tableName) {
 		char * types[] = C_COLUMNS_TYPES;
 		table->block = m_Handler->getStorage()->openBlock(C_COLUMNS_BLOCK);
 		if (!table->block) {
-			perror("Erro ao abrir bloco de dados da tabela COLS!");
+			ERROR( "Erro ao abrir bloco de dados da tabela COLS!");
 			goto freeOpenTable;
 		}
 		table->colsList = vlNew(true);
 		if (!table->colsList) {
-			perror("Erro ao criar lista de colunas!");
+			ERROR( "Erro ao criar lista de colunas!");
 			goto freeOpenTable;
 		}
 		for (int i = 0; i < C_COLUMNS_COLS_COUNT; i++) {
@@ -376,7 +376,7 @@ ObjectCursorType * vogal_definition::openTable(char * tableName) {
 			column->type = vogal_utils::str2type(types[i+C_OBJECTS_COLS_COUNT]);
 			column->block = m_Handler->getStorage()->openBlock(2 + i + C_OBJECTS_COLS_COUNT);
 			if (!column->block) {
-				perror("Erro ao abrir bloco de dados das colunas da tabela COLS!");
+				ERROR( "Erro ao abrir bloco de dados das colunas da tabela COLS!");
 				column->~ColumnCursorType();
 				goto freeOpenTable;
 			}
@@ -393,7 +393,7 @@ ObjectCursorType * vogal_definition::openTable(char * tableName) {
 		char * types[] = C_COLUMNS_TYPES;
 		table->block = m_Handler->getStorage()->openBlock(C_OBJECTS_BLOCK);
 		if (!table->block) {
-			perror("Erro ao abrir bloco de dados da tabela OBJS");
+			ERROR( "Erro ao abrir bloco de dados da tabela OBJS");
 			goto freeOpenTable;
 		}
 		table->colsList = vlNew(true);
@@ -405,7 +405,7 @@ ObjectCursorType * vogal_definition::openTable(char * tableName) {
 			column->type = vogal_utils::str2type(types[i]);
 			column->block = m_Handler->getStorage()->openBlock(2 + i);
 			if (!column->block) {
-				perror("Erro ao abrir bloco de dados das colunas da tabela OBJS!");
+				ERROR( "Erro ao abrir bloco de dados das colunas da tabela OBJS!");
 				column->~ColumnCursorType();
 				goto freeOpenTable;
 			}
@@ -422,7 +422,7 @@ ObjectCursorType * vogal_definition::openTable(char * tableName) {
 
 	// Senão, deve obter através das tabelas do dicionário de dados
 	if (!objsFilter->cursor || !objsFilter->cursor->table) {
-		perror("Impossível abrir cursor dos objetos!");
+		ERROR( "Impossível abrir cursor dos objetos!");
 		goto freeOpenTable;
 	}
 
@@ -434,7 +434,7 @@ ObjectCursorType * vogal_definition::openTable(char * tableName) {
 
 	objsFilter->data->column = findColumn(objsFilter->cursor->table, C_NAME_KEY);
 	if (!objsFilter->data->column) {
-		perror("Coluna do metadados correspondente ao nome da tabela não pode ser encontrada!");
+		ERROR( "Coluna do metadados correspondente ao nome da tabela não pode ser encontrada!");
 		goto freeOpenTable;
 	}
 
@@ -449,7 +449,7 @@ ObjectCursorType * vogal_definition::openTable(char * tableName) {
 	colsFilter->cursor = m_Handler->getManipulation()->openCursor(m_Handler->getCache()->openColumns());
 
 	if (!colsFilter->cursor || !colsFilter->cursor->table) {
-		perror("Impossível abrir cursor das colunas!");
+		ERROR( "Impossível abrir cursor das colunas!");
 		goto freeOpenTable;
 	}
 
@@ -461,7 +461,7 @@ ObjectCursorType * vogal_definition::openTable(char * tableName) {
 
 	colsFilter->data->column = findColumn(colsFilter->cursor->table, C_TABLE_RID_KEY);
 	if (!colsFilter->data->column) {
-		perror("Coluna do metadados correspondente ao RID da tabela não pode ser encontrada!");
+		ERROR( "Coluna do metadados correspondente ao RID da tabela não pode ser encontrada!");
 		goto freeOpenTable;
 	}
 	
@@ -486,7 +486,7 @@ ObjectCursorType * vogal_definition::openTable(char * tableName) {
 			}
 		}
 		if (check != 3) {
-			perror("Erro ao obter a estrutura (colunas) da tabela!");
+			ERROR( "Erro ao obter a estrutura (colunas) da tabela!");
 			goto freeOpenTable;
 		}
 		if (!vlAdd(table->colsList, column)) 
@@ -511,6 +511,12 @@ freeOpenTable:
 
 int vogal_definition::newTable(char* name, PairListRoot * columns){
 	DBUG_ENTER("vogal_definition::newTable");
+
+	// Se está tentando remover a tabela de colunas ou objetos
+	if (!(strcmp(name,C_COLUMNS) + strcmp(name,C_OBJECTS))) {
+		ERROR("Nome de tabela reservado ao metadados!");
+		DBUG_RETURN(false);
+	}
 
 	// Verifica se a tabela existe
     ObjectCursorType * table = openTable(name); 
@@ -544,14 +550,14 @@ int vogal_definition::dropTable(char* name) {
 
 	// Se está tentando remover a tabela de colunas ou objetos
 	if (!(strcmp(name,C_COLUMNS) + strcmp(name,C_OBJECTS))) {
-		perror("Impossível remover tabelas do metadados!");
+		ERROR( "Impossível remover tabelas do metadados!");
 		goto freeDropTable;
 	}
 
 	// Verifica se a tabela existe
     table = openTable(name); 
 	if (!table) {
-		perror("Tabela não encontrada!");
+		ERROR( "Tabela não encontrada!");
 		goto freeDropTable;
 	}
 	
@@ -576,7 +582,7 @@ int vogal_definition::dropTable(char* name) {
 	// Abre cursor
 	cursor = m_Handler->getManipulation()->openCursor(table);
 	if (!cursor) {
-		perror("Impossível abrir cursor da tabela!");
+		ERROR( "Impossível abrir cursor da tabela!");
 		goto freeDropTable;
 	}
 
@@ -591,20 +597,19 @@ int vogal_definition::dropTable(char* name) {
 			blockCur->~BlockCursorType();
 		blockCur = m_Handler->getStorage()->openBlock((*blockAux));
 		if (!blockCur) {
-			perror("Erro ao abrir bloco para limpeza!");
+			ERROR( "Erro ao abrir bloco para limpeza!");
 			goto freeDropTable;
 		}
 		if (!parseBlock(cursor, NULL, blockCur)) {
-			perror("Erro ao efetuar o parse do bloco para limpeza!");
+			ERROR( "Erro ao efetuar o parse do bloco para limpeza!");
 			goto freeDropTable;
 		}
 		for (int io = 0; io < vlCount(blockCur->offsetsList); io++) {
 			blockAux = (BlockOffset *) vlGet(blockCur->offsetsList, io);
 			if (blockAux) {
-				BlockOffset temp = (*blockAux);
-				blockAux = new BlockOffset();
-				(*blockAux) = temp;
-				vlAdd(blockStack, blockAux);
+				BlockOffset * temp = new BlockOffset();
+				(*temp) = (*blockAux);
+				vlAdd(blockStack, temp);
 			}
 		}
 	}
@@ -614,7 +619,7 @@ int vogal_definition::dropTable(char* name) {
 	blockAux = new BlockOffset();
 	while (llPop(blocksToRemove, blockAux)) {
 		if (!m_Handler->getStorage()->writeOnBlock(buffer, (*blockAux))) {
-			perror("Erro ao esvaziar bloco!");
+			ERROR( "Erro ao esvaziar bloco!");
 			free(blockAux);
 			goto freeDropTable;
 		}
@@ -629,7 +634,7 @@ int vogal_definition::dropTable(char* name) {
 
 	// Senão, deve obter através das tabelas do dicionário de dados
 	if (!objsFilter->cursor || !objsFilter->cursor->table) {
-		perror("Impossível abrir cursor dos objetos!");
+		ERROR( "Impossível abrir cursor dos objetos!");
 		goto freeDropTable;
 	}
 
@@ -641,7 +646,7 @@ int vogal_definition::dropTable(char* name) {
 
 	objsFilter->data->column = findColumn(objsFilter->cursor->table, C_NAME_KEY);
 	if (!objsFilter->data->column) {
-		perror("Coluna do metadados correspondente ao nome da tabela não pode ser encontrada!");
+		ERROR( "Coluna do metadados correspondente ao nome da tabela não pode ser encontrada!");
 		goto freeDropTable;
 	}
 
@@ -656,7 +661,7 @@ int vogal_definition::dropTable(char* name) {
 	colsFilter->cursor = m_Handler->getManipulation()->openCursor(m_Handler->getCache()->openColumns());
 
 	if (!colsFilter->cursor || !colsFilter->cursor->table) {
-		perror("Impossível abrir cursor das colunas!");
+		ERROR( "Impossível abrir cursor das colunas!");
 		goto freeDropTable;
 	}
 
@@ -668,7 +673,7 @@ int vogal_definition::dropTable(char* name) {
 
 	colsFilter->data->column = findColumn(colsFilter->cursor->table, C_TABLE_RID_KEY);
 	if (!colsFilter->data->column) {
-		perror("Coluna do metadados correspondente ao RID da tabela não pode ser encontrada!");
+		ERROR( "Coluna do metadados correspondente ao RID da tabela não pode ser encontrada!");
 		goto freeDropTable;
 	}
 
@@ -680,13 +685,13 @@ int vogal_definition::dropTable(char* name) {
 	// 		 e para o fetch não trazer os dados na exclusão
 	while (m_Handler->getManipulation()->fetch(colsFilter)) {
 		if (!m_Handler->getManipulation()->removeFetch(colsFilter)) {
-			perror("Erro ao excluir colunas da tabela!");
+			ERROR( "Erro ao excluir colunas da tabela!");
 			goto freeDropTable;
 		}
 	}
 
 	if (!m_Handler->getManipulation()->removeFetch(objsFilter)) {
-		perror("Erro ao excluir a tabela!");
+		ERROR( "Erro ao excluir a tabela!");
 		goto freeDropTable;
 	}
 
@@ -723,7 +728,7 @@ int vogal_definition::parseBlock(CursorType * cursor, ColumnCursorType * column,
 	GenericPointer p;
 
 	if (!block) {
-		perror("É obrigatório informar o bloco para efetuar o parse");
+		ERROR( "É obrigatório informar o bloco para efetuar o parse");
 		goto freeParseBlock;
 	}
 
@@ -740,7 +745,7 @@ int vogal_definition::parseBlock(CursorType * cursor, ColumnCursorType * column,
 
 	// Lê a quantidade de registros do bloco
 	if (!m_Handler->getStorage()->readDataSize(&p, &dataCount)) {
-		perror("Erro ao ler a quantidade de registros no block");
+		ERROR( "Erro ao ler a quantidade de registros no block");
 		goto freeParseBlock;
 	}
 
@@ -750,7 +755,7 @@ int vogal_definition::parseBlock(CursorType * cursor, ColumnCursorType * column,
 			neighbor = new BlockOffset();
 			// Lê primeiro nó a esquerda
 			if (!m_Handler->getStorage()->readSizedNumber(&p, neighbor)) {
-				perror("Erro ao ler nó a esquerda da árvore de registros");
+				ERROR( "Erro ao ler nó a esquerda da árvore de registros");
 				free(neighbor);
 				goto freeParseBlock;
 			}
@@ -759,7 +764,7 @@ int vogal_definition::parseBlock(CursorType * cursor, ColumnCursorType * column,
 
 			node = m_Handler->getManipulation()->parseRecord(cursor, column, block, &p);
 			if (!node) {
-				perror("Erro ao efetuar o parse do registro!");
+				ERROR( "Erro ao efetuar o parse do registro!");
 				goto freeParseBlock;
 			}
 
@@ -772,7 +777,7 @@ int vogal_definition::parseBlock(CursorType * cursor, ColumnCursorType * column,
 		// Depois do último nó sempre tem o nó a direita
 		neighbor = new BlockOffset();
 		if (!m_Handler->getStorage()->readSizedNumber(&p, neighbor)) {
-			perror("Erro ao ler nó a direita da árvore de registros");
+			ERROR( "Erro ao ler nó a direita da árvore de registros");
 			free(neighbor);
 			goto freeParseBlock;
 		}

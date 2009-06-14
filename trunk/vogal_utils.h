@@ -45,6 +45,8 @@
 //		 Por enquanto é necessário pois o dado pode ser grande demais para caber num inteiro
 #define DIFF(a,b) a>b?1:a<b?-1:0
 
+#define ERROR(msg) fprintf(stderr, msg)
+
 // ### SUBTIPOS ###
 typedef enum {NUMBER,FLOAT,DATE,VARCHAR,UNKNOWN} DataTypes;
 typedef enum {EQ,BG,BGE,SM,SME,NONE} FilterTypes;
