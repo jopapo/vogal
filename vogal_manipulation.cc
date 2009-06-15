@@ -323,7 +323,7 @@ NodeType * vogal_manipulation::parseRecord(CursorType * cursor, ColumnCursorType
 				case NUMBER:
 					node->data->allocSize = sizeof(BigNumber); // Sempre é númeral máximo tratado, no caso LONG LONG INT (64BITS)
 					if (node->data->usedSize > node->data->allocSize) {
-						ERROR("Informação inconsistente na base pois não pode haver númeoros maiores que 64 bits (20 dígitos)"); // Ainda...
+						ERROR("Informação inconsistente na base pois não pode haver números maiores que 64 bits (20 dígitos)"); // Ainda...
 						goto freeParseRecord;
 					}
 					break;
@@ -566,11 +566,15 @@ int vogal_manipulation::updateBlockBuffer(CursorType * cursor, BlockCursorType *
 	if (count > 0) {
 		int writed = 0;
 		int deleted = 0;
+		int added = 0;
 		for (int i = 0; i < count; i++) {
 			node = (NodeType *) vlGet(block->nodesList, i);
 			if (node->deleted) {
 				deleted++;
 				continue;
+			}
+			if (node->inserted) {
+				added++;
 			}
 			neighbor = (BlockOffset *) vlGet(block->offsetsList, i);
 			if (!m_Handler->getStorage()->writeNumber((*neighbor), &p)) {
@@ -608,10 +612,13 @@ int vogal_manipulation::updateBlockBuffer(CursorType * cursor, BlockCursorType *
 					ERROR("Erro ao escrever o rid no buffer da coluna!");
 					goto freeUpdateBlockBuffer;
 				}
+				// Atualiza a informação de localização
+				node->data->blockId = block->id;
+				node->data->blockOffset = i - deleted;
 				// Se excluiu algum antes, atualiza pais
-				if (deleted) {
+				if (!node->inserted && (deleted || added)) {
 					// TODO: Otimizar para fazer todas as operações em memória e gravar em disco apenas uma vez
-					if (!updateLocation(cursor, node, block->id, i - deleted)) {
+					if (!updateLocation(cursor, node, node->data->blockId, node->data->blockOffset)) {
 						ERROR("Erro ao atualizar o deslocamento das colunas do bloco!");
 						goto freeUpdateBlockBuffer;
 					}
@@ -705,11 +712,10 @@ int vogal_manipulation::writeData(CursorType * cursor, RidCursorType * rid, Data
 	BlockOffset * neighbor;
 
 	// Inicialização das variáveis
-	if (data) {
+	if (data)
 		block = data->column->block;
-	} else {
+	else
 		block = cursor->table->block;
-	}
 
 	// Procura o dado mais próximo
 	info = findNearest(cursor, rid, data, block);
@@ -718,30 +724,14 @@ int vogal_manipulation::writeData(CursorType * cursor, RidCursorType * rid, Data
 	if (info) {
 		offset = info->offset;
 		block = info->findedBlock;
-		// Reorganizar deslocamentos dos rids a direita (se estivar gravando um dado)
-		// TODO: Otimizar para fazer todas as operações em memória e gravar em disco apenas uma vez
-		if (data && offset < vlCount(block->nodesList)) {
-			for (int i = offset; i < vlCount(block->nodesList); i++) {
-				NodeType * otherNode = (NodeType *) vlGet(block->nodesList, offset);
-				if (!updateLocation(cursor, otherNode, block->id, offset + 1)) {
-					ERROR("Erro ao atualizar o deslocamento das colunas do bloco!");
-					goto freeWriteData;
-				}
-			}
-		}
-
-	} else {
+	} else
 		offset = 0;
-	}
 
 	// Cria novo nodo e insere no local adequado
 	node = new NodeType();
 	node->rid = rid;
 	node->data = data;
-	if (data) {
-		data->blockId = block->id;
-		data->blockOffset = offset;
-	}
+	node->inserted = true;
 	
 	vlInsert(block->nodesList, node, offset);
 
