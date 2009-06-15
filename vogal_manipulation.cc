@@ -377,6 +377,9 @@ int vogal_manipulation::comparison(SearchInfoType * info, CursorType * cursor, R
 		goto freeComparison;
 	}
 
+	// Inicializa (identifica quando não houver encontrado nada)
+	info->findedNode = NULL;
+	
 continueWhileComparison:
 	if (!info->findedBlock) {
 		ERROR("Por qual bloco começar?!");
@@ -405,10 +408,8 @@ continueWhileComparison:
 
 	count = vlCount(info->findedBlock->nodesList);
 	if (count) {
-		info->offset = -1;
-		for (int i = startingOffset; i < count; i++) {
-			info->compared = false;
-			info->findedNode = (NodeType *) vlGet(info->findedBlock->nodesList, i);
+		for (info->offset = startingOffset; info->offset < count; info->offset++) {
+			info->findedNode = (NodeType *) vlGet(info->findedBlock->nodesList, info->offset);
 			
 			if (info->findedBlock->header->type == C_BLOCK_TYPE_MAIN_TAB) {
 				info->comparison = DIFF(rid2find->id, info->findedNode->rid->id);
@@ -425,13 +426,12 @@ continueWhileComparison:
 						ERROR("Comparação não preparada para o tipo!");
 						goto freeComparison;
 				}
-				info->compared = true;
 			}
 			
 			// Se for o dato for maior que o a ser procurado e terminou a busca
 			if (info->comparison <= 0) {
 				if (info->comparison) {
-					neighbor = (BlockOffset *) vlGet(info->findedBlock->offsetsList, i);
+					neighbor = (BlockOffset *) vlGet(info->findedBlock->offsetsList, info->offset);
 					if (neighbor && (*neighbor)) {
 						info->findedBlock = m_Handler->getStorage()->openBlock((*neighbor));
 						if (!info->blocksList)
@@ -441,12 +441,9 @@ continueWhileComparison:
 						goto continueWhileComparison;
 					}
 				}
-				info->offset = i;
 				break;
 			}
 		}
-		if (info->offset < 0)
-			info->offset = count;
 		neighbor = (BlockOffset *) vlGet(info->findedBlock->offsetsList, count); // Direita!
 		if (neighbor && (*neighbor)) {
 			info->findedBlock = m_Handler->getStorage()->openBlock((*neighbor));
@@ -870,7 +867,7 @@ int vogal_manipulation::fetch(FilterCursorType * filter){
 	}
 
 	// Verifica grau de identificação, no caso, tem que ser igual!
-	if (filter->infoData->comparison) {
+	if (!filter->infoData->findedNode || filter->infoData->comparison) {
 		DBUG_PRINT("INFO", ("Dado não encontrado"));
 		filter->empty = true;
 		goto freeFetch;

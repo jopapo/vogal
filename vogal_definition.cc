@@ -474,7 +474,7 @@ ObjectCursorType * vogal_definition::openTable(char * tableName) {
 	}
 
 	colsFilter->data = new DataCursorType();
-	colsFilter->data->content = (GenericPointer) objsFilter->fetch->id;
+	colsFilter->data->content = (GenericPointer) &objsFilter->fetch->id;
 	colsFilter->data->usedSize = sizeof(BigNumber);
 	colsFilter->data->allocSize = colsFilter->data->usedSize;
 	colsFilter->data->contentOwner = false;
@@ -647,6 +647,13 @@ int vogal_definition::dropTable(char* name) {
 			free(blockAux);
 			goto freeDropTable;
 		}
+		// Relibera blocos para gravação
+		if (!m_Handler->getCache()->addFreeBlock((*blockAux))) {
+			ERROR("Erro ao reliberar bloco para gravação!");
+			free(blockAux);
+			goto freeDropTable;
+		}
+		
 	}
 	free(blockAux);
 
@@ -690,7 +697,7 @@ int vogal_definition::dropTable(char* name) {
 	}
 
 	colsFilter->data = new DataCursorType();
-	colsFilter->data->content = (GenericPointer) objsFilter->fetch->id;
+	colsFilter->data->content = (GenericPointer) &objsFilter->fetch->id;
 	colsFilter->data->usedSize = sizeof(BigNumber);
 	colsFilter->data->allocSize = colsFilter->data->usedSize;
 	colsFilter->data->contentOwner = false;

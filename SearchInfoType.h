@@ -17,7 +17,6 @@ public:
 	NodeType        *findedNode;
 	int				 offset;
 	int				 comparison;
-	bool			 compared;
 	
 };
 

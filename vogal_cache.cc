@@ -41,7 +41,7 @@ int vogal_cache::bufferize(){
 		BlockHeaderType * header = (BlockHeaderType *) buf;
 		// Verifica se o primeiro bit está ativo, se não estive, está vazio
 		if (!header->valid) {
-			llPush(m_FreeBlocks, offset);
+			addFreeBlock(offset);
 		}
 	}
 	freeBuffer(buf);
@@ -81,6 +81,14 @@ int vogal_cache::unlockBlock(BlockOffset block) {
 	
 	llRemove(m_LockedBlocks, block);
 	//llDump(lockedBlocks);
+	
+	DBUG_RETURN(true);
+}
+
+int vogal_cache::addFreeBlock(BlockOffset block) {
+	DBUG_ENTER("vogal_cache::addFreeBlock");
+
+	llPush(m_FreeBlocks, block);
 	
 	DBUG_RETURN(true);
 }

@@ -22,6 +22,7 @@ public:
 	
 	int lockFreeBlock(BlockOffset *pos);
 	int unlockBlock(BlockOffset block);
+	int addFreeBlock(BlockOffset block);
 	
 	ObjectCursorType *openObjects();
 	ObjectCursorType *openColumns();

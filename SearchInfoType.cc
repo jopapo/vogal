@@ -10,7 +10,6 @@ SearchInfoType::SearchInfoType() {
 	findedNode = NULL;
 	offset = 0;
 	comparison = 0;
-	compared = false;
 	
 	DBUG_LEAVE;
 }
