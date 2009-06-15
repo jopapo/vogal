@@ -339,7 +339,9 @@ int vlAdd(ValueListRoot* root, ListValueType value) {
 
 int vlInsert(ValueListRoot* root, ListValueType value, int index) {
 	DBUG_ENTER("vlInsert");
-	if (index < 0) {
+	if (!root)
+		DBUG_RETURN(false);
+	if (index < 0 || index > root->count) {
 		ERROR("Index inválido!");
 		DBUG_RETURN(false);
 	}
@@ -349,6 +351,25 @@ int vlInsert(ValueListRoot* root, ListValueType value, int index) {
 		root->root[i] = root->root[i-1];
 	root->root[index] = value;
 	root->count++;
+	DBUG_RETURN(true);
+}
+
+int vlRemove(ValueListRoot* root, int index) {
+	DBUG_ENTER("vlRemove");
+	if (!root)
+		DBUG_RETURN(false);
+	if (index < 0 || index >= root->count) {
+		ERROR("Index inválido!");
+		DBUG_RETURN(false);
+	}
+	// Grava ponteiro do nó
+	ListValueType removed = root->root[index];
+	if (root->owner) // Remove se necessário
+		free(removed);
+	// Reorganiza lista
+	for (int i = index; i < root->count - 1; i++)
+		root->root[i] = root->root[i+1];
+	root->count--;
 	DBUG_RETURN(true);
 }
 

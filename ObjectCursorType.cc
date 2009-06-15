@@ -8,7 +8,7 @@ ObjectCursorType::ObjectCursorType() {
 	name = NULL;
 	colsList = NULL;
 	block = NULL;
-	dictionary = false;
+	//dictionary = false;
 	
 	DBUG_LEAVE;
 }
