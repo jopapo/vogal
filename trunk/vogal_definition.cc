@@ -836,8 +836,6 @@ int vogal_definition::parseBlock(CursorType * cursor, ColumnCursorType * column,
 		vlAdd(block->offsetsList, neighbor);
 	}
 
-	block->freeSpace = C_BLOCK_SIZE - (p - block->buffer); // O deslocamento é o espaço usado no bloco!
-
 	ret = true;
 		
 freeParseBlock:

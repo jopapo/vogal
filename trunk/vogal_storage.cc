@@ -317,18 +317,6 @@ int vogal_storage::writeString(char * strValue, GenericPointer* where){
 	DBUG_RETURN(ret);
 }
 
-BigNumber vogal_storage::bytesNeeded(BigNumber dataSize) {
-	DBUG_ENTER("vogal_storage::bytesNeeded");
-
-	BigNumber bytes = dataSize + 1; // Pelo menos um byte é necessário para representar o tamanho 0
-	do {
-		bytes++;
-		dataSize /= 2^7; // 7 = sizeof(VariableSizeType.data)
-	} while (dataSize > 2);
-
-	DBUG_RETURN(bytes);	
-}
-
 /*
 
 int vogal_storage::writeBlockPointer(BlockOffset where, BlockOffset offset, GenericPointer* buf){

@@ -37,8 +37,6 @@ public:
 	int skipAllData(GenericPointer* src, BigNumber count);
 	int skipDataSize(GenericPointer* src);
 
-	BigNumber bytesNeeded(BigNumber dataSize);
-
 	bool isOpen();
 
 	/*int writeBlockPointer(BlockOffset where, BlockOffset offset, GenericPointer* buf);

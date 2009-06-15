@@ -12,12 +12,16 @@ public:
 	virtual ~FilterCursorType();
 
 	bool 			  opened;
-	bool			  empty;
+	bool			  notFound;
 	CursorType		 *cursor;
 	DataCursorType	 *data;
 	RidCursorType 	 *fetch;
 	SearchInfoType   *infoData;
 	SearchInfoType   *infoFetch;
+	BigNumber		  count;
+	bool 			  cursorOwner;
+
+	void reset();
 		
 };
 
