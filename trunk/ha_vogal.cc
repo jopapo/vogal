@@ -626,7 +626,7 @@ int ha_vogal::create(const char *name, TABLE *table_arg,
 	DBUG_ENTER("ha_vogal::create");
 
 	// Teste de DEBUG!!! Remover esta linha
-	//vogal->ensureSanity();
+	vogal->ensureSanity();
 
 	PairListRoot * colList = plNew(false, false);
 	for (Field **field= table_arg->s->field; *field; field++) {

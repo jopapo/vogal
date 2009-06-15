@@ -442,6 +442,10 @@ ObjectCursorType * vogal_definition::openTable(char * tableName) {
 
 	// Procura a tabela	
 	if (!m_Handler->getManipulation()->fetch(objsFilter)) {
+		ERROR("Erro ao efetuar o fetch da tabela!");
+		goto freeOpenTable;
+	}
+	if (!objsFilter->fetch) {
 		DBUG_PRINT("INFO", ("Tabela não encontrada!"));
 		goto freeOpenTable;
 	}
@@ -489,7 +493,13 @@ ObjectCursorType * vogal_definition::openTable(char * tableName) {
 	table->colsList = vlNew(true);
 	if (!table->colsList)
 		goto freeOpenTable;
-	while (m_Handler->getManipulation()->fetch(colsFilter)) {
+	do {
+		if (!m_Handler->getManipulation()->fetch(colsFilter)) {
+			ERROR("Impossível efetuar o fetch das colunas!");
+			goto freeOpenTable;
+		}
+		if (!colsFilter->fetch)
+			break;
 		int check = 0;
 		ColumnCursorType * column = new ColumnCursorType(vlCount(table->colsList));
 		for (int i = 0; i < vlCount(colsFilter->fetch->dataList); i++) {
@@ -511,7 +521,7 @@ ObjectCursorType * vogal_definition::openTable(char * tableName) {
 		}
 		if (!vlAdd(table->colsList, column)) 
 			goto freeOpenTable;
-	}
+	} while (true);
 	if (vlCount(table->colsList) <= 0) {
 		ERROR("Quantidade inválida de colunas!");
 		goto freeOpenTable;
@@ -681,8 +691,12 @@ int vogal_definition::dropTable(char* name) {
 		goto freeDropTable;
 	}
 
-	// Procura a tabela	
+	// Procura a tabela
 	if (!m_Handler->getManipulation()->fetch(objsFilter)) {
+		ERROR("Erro ao efetuar o fetch do objeto!");
+		goto freeDropTable;
+	}
+	if (!objsFilter->fetch) {
 		DBUG_PRINT("INFO", ("Tabela não encontrada!"));
 		goto freeDropTable;
 	}
@@ -714,12 +728,18 @@ int vogal_definition::dropTable(char* name) {
 	// Varre as colunas da tabela
 	// TODO: Melhorar para excluir tudo e só depois gravar no arquivão
 	// 		 e para o fetch não trazer os dados na exclusão
-	while (m_Handler->getManipulation()->fetch(colsFilter)) {
+	do {
+		if (!m_Handler->getManipulation()->fetch(colsFilter)) {
+			ERROR("Erro ao efetuar o fetch das colunas!");
+			goto freeDropTable;
+		}
+		if (!colsFilter->fetch)
+			break;
 		if (!m_Handler->getManipulation()->removeFetch(colsFilter)) {
 			ERROR("Erro ao excluir colunas da tabela!");
 			goto freeDropTable;
 		}
-	}
+	} while (true);
 
 	if (!m_Handler->getManipulation()->removeFetch(objsFilter)) {
 		ERROR("Erro ao excluir a tabela!");

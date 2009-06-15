@@ -24,7 +24,7 @@ LinkedListRootType* llNew() {
 int llFreeNode(LinkedListType** node) {
 	DBUG_ENTER("llFreeNode");
 	
-	if (node) {
+	if (node && (*node)) {
 		llFreeNode(&(*node)->next);
 		free((*node));
 		(*node) = NULL;

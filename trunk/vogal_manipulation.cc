@@ -174,6 +174,7 @@ freeInsertData:
 int vogal_manipulation::removeFetch(FilterCursorType * filter) {
 	DBUG_ENTER("vogal_manipulation::removeFetch");
 
+	int ret = false;
 	DataCursorType * data;
 	BlockCursorType * block = NULL;
 	NodeType * node;
@@ -188,7 +189,7 @@ int vogal_manipulation::removeFetch(FilterCursorType * filter) {
 			goto freeRemoveFetch;
 		}
 
-		if (!m_Handler->getDefinition()->parseBlock(filter->cursor, NULL, block)) {
+		if (!m_Handler->getDefinition()->parseBlock(filter->cursor, data->column, block)) {
 			ERROR("Erro ao efetuar o parse ao carregar dado da coluna!");
 			goto freeRemoveFetch;
 		}
@@ -201,7 +202,7 @@ int vogal_manipulation::removeFetch(FilterCursorType * filter) {
 		node->deleted = true;
 
 		// Atualiza e grava
-		if (!updateBlockBuffer(filter->cursor, block)) {
+		if (!updateBlockBuffer(filter->cursor, block, 1)) {
 			ERROR("Erro ao atualizar o buffer do bloco!");
 			goto freeRemoveFetch;
 		}
@@ -220,7 +221,7 @@ int vogal_manipulation::removeFetch(FilterCursorType * filter) {
 	filter->infoFetch->findedNode->deleted = true;
 
 	// Atualiza e grava
-	if (!updateBlockBuffer(filter->cursor, filter->infoFetch->findedBlock)) {
+	if (!updateBlockBuffer(filter->cursor, filter->infoFetch->findedBlock, 1)) {
 		ERROR("Erro ao atualizar o buffer do bloco dos rids!");
 		goto freeRemoveFetch;
 	}
@@ -230,11 +231,13 @@ int vogal_manipulation::removeFetch(FilterCursorType * filter) {
 		goto freeRemoveFetch;
 	}
 
+	ret = true;
+
 freeRemoveFetch:
 	if (block)
 		block->~BlockCursorType();
 	
-	DBUG_RETURN(true);
+	DBUG_RETURN(ret);
 }
 
 CursorType * vogal_manipulation::openCursor(ObjectCursorType * object){
@@ -279,12 +282,6 @@ NodeType * vogal_manipulation::parseRecord(CursorType * cursor, ColumnCursorType
 			goto freeParseRecord;
 		}
 
-		// Erro!!!
-		if (!node->rid->id) {
-			ERROR("Rid com valor zerado!");
-			goto freeParseRecord;
-		}
-		
 		// Lê deslocamentos
 		for (int i = 0; i < vlCount(cursor->table->colsList); i++) {
 			DataCursorType * data = new DataCursorType();
@@ -346,7 +343,7 @@ NodeType * vogal_manipulation::parseRecord(CursorType * cursor, ColumnCursorType
 			}
 		} else {
 			// Pula o dado
-			offset += node->data->usedSize;
+			(*offset) += node->data->usedSize;
 		}
 		// Lê o número do RID
 		if (!m_Handler->getStorage()->readSizedNumber(offset, &node->rid->id)) {
@@ -355,6 +352,12 @@ NodeType * vogal_manipulation::parseRecord(CursorType * cursor, ColumnCursorType
 		}
 	}
 
+	// Validação da leitura
+	if (!node->rid->id) {
+		ERROR("Rid com valor zerado!");
+		goto freeParseRecord;
+	}
+	
 	DBUG_RETURN(node);
 
 freeParseRecord:
@@ -481,7 +484,7 @@ SearchInfoType * vogal_manipulation::findNearest(CursorType * cursor, RidCursorT
 	DBUG_RETURN(info);
 }
 
-int vogal_manipulation::updateBlockBuffer(CursorType * cursor, BlockCursorType * block) {
+int vogal_manipulation::updateBlockBuffer(CursorType * cursor, BlockCursorType * block, int removed) {
 	DBUG_ENTER("vogal_manipulation::updateBlockBuffer");
 
 	int ret = false;
@@ -499,7 +502,7 @@ int vogal_manipulation::updateBlockBuffer(CursorType * cursor, BlockCursorType *
 		count = vlCount(block->nodesList);
 
 	p = block->buffer + sizeof(BlockHeaderType);
-	if (!m_Handler->getStorage()->writeDataSize(&p, count)) {
+	if (!m_Handler->getStorage()->writeDataSize(&p, count - removed)) {
 		ERROR("Erro ao escrever a quantidade de dados do bloco!");
 		goto freeUpdateBlockBuffer;
 	}
@@ -599,7 +602,7 @@ int vogal_manipulation::updateLocation(CursorType * cursor, NodeType * node, Blo
 
 	// Se não achou em memória, faz a busca na base
 	info = findNearest(cursor, node->rid, NULL, cursor->table->block);
-	if (info && !info->comparison) {
+	if (info && info->findedNode && !info->comparison) {
 		// Procura a coluna com offset atualizado
 		DataCursorType * data = (DataCursorType *) vlGet(info->findedNode->rid->dataList, node->data->column->getId());
 		if (!data) {
@@ -840,8 +843,11 @@ int vogal_manipulation::fetch(FilterCursorType * filter){
 		goto freeFetch;
 	}
 
+	filter->fetch = NULL;
+
 	if (filter->empty) {
-		DBUG_PRINT("INFO", ("Fim dos dados!"));
+		DBUG_PRINT("INFO", ("Cursor no fim dos dados!"));
+		ret = true;
 		goto freeFetch;
 	}
 
@@ -870,6 +876,7 @@ int vogal_manipulation::fetch(FilterCursorType * filter){
 	if (!filter->infoData->findedNode || filter->infoData->comparison) {
 		DBUG_PRINT("INFO", ("Dado não encontrado"));
 		filter->empty = true;
+		ret = true;
 		goto freeFetch;
 	}
 
