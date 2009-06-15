@@ -8,6 +8,7 @@ NodeType::NodeType() {
 	data = NULL;
 	dataOwner = false;
 	deleted = false;
+	inserted = false;
 	
 	DBUG_LEAVE;
 }

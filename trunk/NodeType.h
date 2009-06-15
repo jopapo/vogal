@@ -14,7 +14,10 @@ public:
 	RidCursorType  *rid;
 	DataCursorType *data;
 	bool 			dataOwner;
+
+	// Auxiliares na reorganização dos blocos
 	bool			deleted;
+	bool 			inserted;
 	
 };
 

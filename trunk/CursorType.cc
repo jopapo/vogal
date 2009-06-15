@@ -15,7 +15,7 @@ CursorType::CursorType() {
 CursorType::~CursorType() {
 	DBUG_ENTER("CursorType::~CursorType");
 
-	if (table) {
+	if (table && !table->dictionary) {
 		table->~ObjectCursorType();
 		table = NULL;
 	}

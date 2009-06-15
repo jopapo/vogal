@@ -290,9 +290,10 @@ int ha_vogal::write_row(uchar *buf) {
 	BigNumber * number;
 	DataCursorType * data;
 	BigNumber rid;
-	String str_aux;
 	CursorType * cursor = NULL;
 	ValueListRoot * dataList = vlNew(true);
+	char* buffer;
+	String str_aux;
 
 	// Habilita campos para leitura
 	my_bitmap_map *org_bitmap= dbug_tmp_use_all_columns(table, table->read_set);
@@ -315,9 +316,10 @@ int ha_vogal::write_row(uchar *buf) {
 				data->contentOwner = false;
 				data->usedSize = (*field)->data_length();
 				data->allocSize = 1024;
-				data->content = (GenericPointer) malloc(data->allocSize);
-				str_aux = String((char*) data->content, data->allocSize, NULL);
-				(*field)->val_str(&str_aux, &str_aux);
+				buffer = new char[data->allocSize];
+				str_aux = String(buffer, data->allocSize, NULL);
+				(*field)->val_str(&str_aux);
+				data->content = (GenericPointer) str_aux.ptr();
 				break;
 			case NUMBER:
 				number = new BigNumber();
@@ -401,30 +403,26 @@ int ha_vogal::vogal2mysql(CursorType * cursor, RidCursorType * rid) {
 	DBUG_ENTER("ha_vogal::vogal2mysql");
 
 	int ret = false;
+	DataCursorType * data;
 	
 	// Habilita campos para escrita
 	my_bitmap_map *org_bitmap= dbug_tmp_use_all_columns(table, table->write_set);
 
+	// Obs: Está sendo considerado que a ordem das colunas no MySQL é a mesma que no Vogal
 	for (Field ** field = table->field; *field; field++) {
 		if (!bitmap_is_set(table->write_set, (*field)->field_index))
 			continue;
-		DataCursorType * data;
-		ColumnCursorType * col = vogal->getDefinition()->findColumn(cursor->table, const_cast<char*>((*field)->field_name));
-		if (!col) {
-			ERROR("Coluna da tabela não pode ser localizada para ler linha!");
-			goto error;
-		}
-		data = (DataCursorType*) vlGet(rid->dataList, col->getId());
+		data = (DataCursorType*) vlGet(rid->dataList, (*field)->field_index);
 		if (!data) {
 			ERROR("Dado da coluna da tabela não pode ser localizada para ler linha!");
 			goto error;
 		}
-		switch (col->type) {
-			VARCHAR:
+		switch (data->column->type) {
+			case VARCHAR:
 				(*field)->store( (char*) data->content, data->usedSize, NULL);
 				break;
-			NUMBER:
-				(*field)->store( *(int64*) data->content );
+			case NUMBER:
+				(*field)->store( (*(BigNumber*) data->content) );
 				break;
 			default:
 				ERROR("Não preparado para tipo!");
@@ -546,9 +544,6 @@ int ha_vogal::create(const char *name, TABLE *table_arg,
                        HA_CREATE_INFO *create_info)
 {
 	DBUG_ENTER("ha_vogal::create");
-
-	// Teste de DEBUG!!! Remover esta linha
-	vogal->ensureSanity();
 
 	PairListRoot * colList = plNew(false, false);
 	for (Field **field= table_arg->s->field; *field; field++) {

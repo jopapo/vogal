@@ -132,7 +132,7 @@ int vogal_storage::readBlock(BlockOffset block, GenericPointer buffer) {
 int vogal_storage::writeNumber(BigNumber number, GenericPointer* where){
 	DBUG_ENTER("vogal_storage::writeNumber");
 	
-	int ret = writeData(where, (GenericPointer)&number, sizeof(number), NUMBER);
+	int ret = writeData(where, (GenericPointer)&number, sizeof(BigNumber), NUMBER);
 	
 	DBUG_RETURN(ret);
 }
@@ -150,8 +150,10 @@ int vogal_storage::writeData(GenericPointer* dest, GenericPointer src, BigNumber
 			break;
 	}
 	// Grava o tamanho do dado
-	if (!writeDataSize(dest, dataBytes))
+	if (!writeDataSize(dest, dataBytes)) {
+		ERROR("Erro ao gravar tamanho do dado!");
 		DBUG_RETURN(false);
+	}
 	// Grava o dado
 	memcpy((*dest), src, dataBytes);
 	(*dest) += dataBytes;
