@@ -43,6 +43,7 @@ int llFree(LinkedListRootType** root) {
 	DBUG_RETURN(true);
 }
 
+// TODO: Melhorar esse merge. Pra que criar pra remover depois?
 void llMergeCheck(LinkedListType* previous, LinkedListType* node) {
 	DBUG_ENTER("llMergeCheck");
 	if (!node)
@@ -65,7 +66,12 @@ void llMergeCheck(LinkedListType* previous, LinkedListType* node) {
 				free(next);
 			}
 		} else {
-			node->link = true;
+			if (next->link) {
+				next->key = node->key;
+				previous->next = next;
+				free(node);
+			} else 
+				node->link = true;
 		}
 	}
 	DBUG_LEAVE;
@@ -125,7 +131,7 @@ int llPush(LinkedListRootType* root, ListDataType key) {
 						llMergeCheck(previous, iterator);
 						DBUG_RETURN(true);
 					}
-				} 
+				}
 				if ((!next) || (next->key > key)) {
 					// Se for o próximo (mais de 1 de diferença)
 					LinkedListType* node = (LinkedListType*) malloc (sizeof(LinkedListType));
@@ -163,9 +169,10 @@ int llPop(LinkedListRootType* root, ListDataType * key) {
 				DBUG_RETURN(true);
 		} 
 		root->root = node->next;
-		free(&node);
+		free(node);
 	} else {
-		free(&root->root);
+		free(root->root);
+		root->root = NULL;
 	}
 	
 	DBUG_RETURN(true);
