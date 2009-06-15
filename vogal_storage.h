@@ -39,6 +39,8 @@ public:
 
 	BigNumber bytesNeeded(BigNumber dataSize);
 
+	bool isOpen();
+
 	/*int writeBlockPointer(BlockOffset where, BlockOffset offset, GenericPointer* buf);
 	int writeInt(int value, GenericPointer* dest);
 	int writeIt(GenericPointer buf);

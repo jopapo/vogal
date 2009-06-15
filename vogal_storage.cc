@@ -54,20 +54,26 @@ int vogal_storage::openDatabase(int mode) {
 	DBUG_ENTER("vogal_storage::openDatabase");
 	
 	// Só abre se estiver fechado
-	if (m_DB <= 0) {
+	if (!isOpen()) {
 		m_DB = my_open(C_FILENAME, O_RDWR | mode, MYF(0));
-		if (m_DB <= 0)
+		if (!isOpen())
 			DBUG_RETURN(false);
 	}
 
 	DBUG_RETURN(true);
 }
 
+bool vogal_storage::isOpen() {
+	DBUG_ENTER("vogal_storage::isOpen");
+	
+	DBUG_RETURN(m_DB > 0);
+}
+
 void vogal_storage::closeDatabase() {
 	DBUG_ENTER("vogal_storage::closeDatabase");
 
 	// Só fecha se estiver aberto
-	if (m_DB <= 0)
+	if (!isOpen())
 		DBUG_LEAVE;
 	
 	// Atualiza arquivo
@@ -153,25 +159,6 @@ int vogal_storage::writeData(GenericPointer* dest, GenericPointer src, BigNumber
 	DBUG_RETURN(true);
 }
 
-int vogal_storage::writeDataSize(GenericPointer* dest, BigNumber size){
-	DBUG_ENTER("vogal_storage::writeDataSize");
-	
-// Importante!!! Implementar mecanismo de redução do "size" para o mínimo possível, ou seja,
-// qdo vier um long long int de 64 bits com o valor "100", reduzí-lo para 8 bits (1 byte), pois 
-// é o suficiente para representar esse valor no banco.
-// *OBSERVAÇÃO: APENAS ESTÁ FUNCIONANDO PARA CAMPOS COM NO MÁXIMO 127 BYTES*
-// TODO (Limitação): Terminar rotina de gravação do tamanho dinâmico (Inclusive, permitir tamanhos maiores que *int*)
-	do {
-		VariableSizeType * var_p = (VariableSizeType *)(*dest);
-		var_p->more = false; 
-		var_p->size = size;
-		size = 0;
-		(*dest)+=sizeof(VariableSizeType);
-	} while (size);
-	
-	DBUG_RETURN(true);
-}
-
 int vogal_storage::writeBlock(BlockCursorType* block){
 	DBUG_ENTER("vogal_storage::writeBlock");
 
@@ -215,13 +202,34 @@ int vogal_storage::readSizedNumber(GenericPointer* src, BigNumber* number){
 	DBUG_RETURN( readNumber(src, number, dataBytes) );
 }
 
+int vogal_storage::writeDataSize(GenericPointer* dest, BigNumber size){
+	DBUG_ENTER("vogal_storage::writeDataSize");
+	
+	do {
+		VariableSizeType * var_p = (VariableSizeType *)(*dest);
+		var_p->size = size & (unsigned char)127; // Tamanho máximo
+		size >>= 7; // Desloca 7 bits pra direita
+		var_p->more = size > 0;
+		(*dest)+=sizeof(VariableSizeType);
+	} while (size);
+	
+	DBUG_RETURN(true);
+}
+
+// TODO: Corrigir leitura sequenciais
 int vogal_storage::readDataSize(GenericPointer* src, BigNumber* dest){
 	DBUG_ENTER("vogal_storage::readDataSize");
 
-	(*dest) = 0; // Primeiro zera a variável da recepção
-	VariableSizeType * var_p = (VariableSizeType *)(*src);
-	(*dest) = var_p->size;
-	(*src)+=sizeof(VariableSizeType);
+	(*dest) = 0; // Zera geral para não interferir na operação lógica
+	bool more = false;
+	do {
+		VariableSizeType * var_p = (VariableSizeType *)(*src);
+		(*dest) |= var_p->size;
+		more = var_p->more;
+		(*src)+=sizeof(VariableSizeType);
+		if (more)
+			(*dest) <<= 7; // Desloca os bits 7 para esquerda
+	} while (more);
 
 	DBUG_RETURN(true);
 }

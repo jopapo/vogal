@@ -64,6 +64,7 @@ int vogal_handler::ensureSanity() {
 	DBUG_ENTER("vogal_handler::ensureSanity");
 
 	bool newDatabase = false;
+	bool notOpened = !getStorage()->isOpen();
 	
 	if (!getStorage()->openDatabase()) {
 		if (getStorage()->initialize()) {
@@ -73,17 +74,19 @@ int vogal_handler::ensureSanity() {
 			DBUG_RETURN(false);
 		}
 	}
-	
-	if (!getCache()->bufferize()) {
-		ERROR("Erro ao bufferizar DB");
-		DBUG_RETURN(false);
-	}
 
-	if (newDatabase)
-		if (!getDefinition()->createDataDictionary()) {
-			ERROR("Erro ao criar dicionário de dados");
+	if (notOpened) {
+		if (!getCache()->bufferize()) {
+			ERROR("Erro ao bufferizar DB");
 			DBUG_RETURN(false);
 		}
+
+		if (newDatabase)
+			if (!getDefinition()->createDataDictionary()) {
+				ERROR("Erro ao criar dicionário de dados");
+				DBUG_RETURN(false);
+			}
+	}
 		
 	DBUG_RETURN(true);
 }

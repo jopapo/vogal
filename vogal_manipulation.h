@@ -26,7 +26,7 @@ public:
 	NodeType * parseRecord(CursorType * cursor, ColumnCursorType * column, BlockCursorType * block, GenericPointer * offset);
 	int comparison(SearchInfoType * info, CursorType * cursor, RidCursorType * rid2find, DataCursorType * data2find, int startingOffset = 0);
 	SearchInfoType * findNearest(CursorType * cursor, RidCursorType * rid2find, DataCursorType * data2find, BlockCursorType * rootBlock);
-	int updateBlockBuffer(CursorType * cursor, BlockCursorType * block);
+	int updateBlockBuffer(CursorType * cursor, BlockCursorType * block, int removed = 0);
 	int updateLocation(CursorType * cursor, NodeType * node, BlockOffset blockId, BlockOffset blockOffset);
 	
 	BigNumber insertData(CursorType* cursor, ValueListRoot* data);
