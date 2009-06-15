@@ -7,7 +7,6 @@ BlockCursorType::BlockCursorType() {
 	
 	id = 0;
 	buffer = NULL;
-	freeSpace = 0;
 	nodesList = NULL;
 	offsetsList = NULL;
 	

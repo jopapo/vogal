@@ -20,7 +20,6 @@ public:
 	};
 
 	// Disponíveis apenas após o parse
-	int freeSpace;
 	ValueListRoot *nodesList; // <NodeType>
 	ValueListRoot *offsetsList; // <BlockOffset>
 	

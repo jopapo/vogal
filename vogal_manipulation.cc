@@ -373,6 +373,7 @@ int vogal_manipulation::comparison(SearchInfoType * info, CursorType * cursor, R
 
 	int ret = false;
 	int count;
+	bool needsComparison = true;
 	BlockOffset * neighbor;
 	
 	if (!info) {
@@ -382,6 +383,7 @@ int vogal_manipulation::comparison(SearchInfoType * info, CursorType * cursor, R
 
 	// Inicializa (identifica quando não houver encontrado nada)
 	info->findedNode = NULL;
+	info->comparison = -1;
 	
 continueWhileComparison:
 	if (!info->findedBlock) {
@@ -392,15 +394,18 @@ continueWhileComparison:
 		ERROR("Bloco não bufferizado para efetuar o parse!");
 		goto freeComparison;
 	}
+	// É pra começar do início se não vier nada
 	if (info->findedBlock->header->type == C_BLOCK_TYPE_MAIN_TAB) {
 		if (!rid2find) {
-			ERROR("Nenhum rid para localização!");
-			goto freeComparison;
+			needsComparison = false;
+			/*ERROR("Nenhum rid para localização!");
+			goto freeComparison;*/
 		}
 	} else {
 		if (!data2find) {
-			ERROR("Nenhum dado para localização!");
-			goto freeComparison;
+			needsComparison = false;
+			/*ERROR("Nenhum dado para localização!");
+			goto freeComparison;*/
 		}
 	}
 	if (!startingOffset) 
@@ -413,21 +418,23 @@ continueWhileComparison:
 	if (count) {
 		for (info->offset = startingOffset; info->offset < count; info->offset++) {
 			info->findedNode = (NodeType *) vlGet(info->findedBlock->nodesList, info->offset);
-			
-			if (info->findedBlock->header->type == C_BLOCK_TYPE_MAIN_TAB) {
-				info->comparison = DIFF(rid2find->id, info->findedNode->rid->id);
-			} else {
-				// Comparação
-				switch (data2find->column->type) {
-					case NUMBER:
-						info->comparison = DIFF((*(BigNumber*)data2find->content), (*(BigNumber*)info->findedNode->data->content));
-						break;
-					case VARCHAR:
-						info->comparison = strncmp((char *) data2find->content, (char *) info->findedNode->data->content, MIN(data2find->usedSize, info->findedNode->data->usedSize));
-						break;
-					default:
-						ERROR("Comparação não preparada para o tipo!");
-						goto freeComparison;
+
+			if (needsComparison) {
+				if (info->findedBlock->header->type == C_BLOCK_TYPE_MAIN_TAB) {
+					info->comparison = DIFF(rid2find->id, info->findedNode->rid->id);
+				} else {
+					// Comparação
+					switch (data2find->column->type) {
+						case NUMBER:
+							info->comparison = DIFF((*(BigNumber*)data2find->content), (*(BigNumber*)info->findedNode->data->content));
+							break;
+						case VARCHAR:
+							info->comparison = strncmp((char *) data2find->content, (char *) info->findedNode->data->content, MIN(data2find->usedSize, info->findedNode->data->usedSize));
+							break;
+						default:
+							ERROR("Comparação não preparada para o tipo!");
+							goto freeComparison;
+					}
 				}
 			}
 			
@@ -492,6 +499,8 @@ int vogal_manipulation::updateBlockBuffer(CursorType * cursor, BlockCursorType *
 	GenericPointer p;
 	BlockOffset * neighbor;
 	NodeType * node;
+	int validValues;
+	int neededSpace;
 
 	if (!block) {
 		ERROR("Bloco inválido para atualização!");
@@ -501,6 +510,53 @@ int vogal_manipulation::updateBlockBuffer(CursorType * cursor, BlockCursorType *
 	if (block->nodesList)
 		count = vlCount(block->nodesList);
 
+	// Estimar tamanho necessário.
+	// TODO: Melhorar a estimativa de campos numéricos - Está pegando sempre máximo em relação ao tamanho da base de dados
+	validValues = count - removed;
+	neededSpace =
+		sizeof(BlockHeaderType) + // Cabeçalho
+		2 + // Tamanho necessário para representar a qtd registros
+		6 * validValues?validValues+1:0; // Quantidade de ponteiros à esquerda dos nodos e, se houver dados (validValues?), um ponteiro à direita
+	for (int i = 0; i < count; i++) {
+		node = (NodeType *) vlGet(block->nodesList, i);
+		if (node->deleted)
+			continue;
+		if (block->header->type == C_BLOCK_TYPE_MAIN_TAB) {
+			neededSpace +=
+				6 + // Rid
+				vlCount(node->rid->dataList) * ( 6 + 2 ); // Blocos (6) + Deslocamentos (2)
+		} else {
+			neededSpace +=
+				node->data->usedSize + // Dado da chave
+				6; // Rid
+		}
+	}
+
+	// Se não há mais dados no bloco, estudar possibilidade de eliminá-lo
+	if (!validValues) {
+		DBUG_PRINT("INFO", ("TESTE - ELIMINOU!"));
+	}
+	// Se o espaço necessário for maior que o disponível no bloco, deve separá-lo (split)
+	// TODO: Testar formações de campos que sejam muito grandes, ou seja, maior que o bloco de 1024 bytes
+	else if (neededSpace > C_BLOCK_SIZE) {
+		/*BlockOffset splitBlockId;
+		BlockCursorType * splitBlock;
+		// Obtém um novo bloco livre
+		if (!m_Handler->getCache()->lockFreeBlock(&splitBlockId)) {
+			ERROR("Impossível obter bloco livre para dividir bloco sobrecarregado!");
+			goto freeUpdateBlockBuffer;
+		}
+		// Abre o bloco e divide as informações
+		splitBlock = m_Handler->getStorage()->openBlock(splitBlockId);
+		if (!splitBlock) {
+			ERROR("Impossível abrir bloco livre para dividir bloco sobrecarregado!");
+			goto freeUpdateBlockBuffer;
+		}*/
+		
+		DBUG_PRINT("INFO", ("TESTE - SPLITOU!"));
+	}
+
+		
 	p = block->buffer + sizeof(BlockHeaderType);
 	if (!m_Handler->getStorage()->writeDataSize(&p, count - removed)) {
 		ERROR("Erro ao escrever a quantidade de dados do bloco!");
@@ -576,8 +632,6 @@ int vogal_manipulation::updateBlockBuffer(CursorType * cursor, BlockCursorType *
 		}
 	}
 
-	block->freeSpace = C_BLOCK_SIZE - (p - block->buffer); // O deslocamento é o espaço usado no bloco!
-
 	ret = true;
 	
 freeUpdateBlockBuffer:
@@ -644,8 +698,6 @@ int vogal_manipulation::writeData(CursorType * cursor, RidCursorType * rid, Data
 
 	// Declaração das variáveis
 	int ret = false;
-	BigNumber neededSpace;
-	BigNumber freeSpace;
 	BlockCursorType *block;
 	SearchInfoType *info = NULL;
 	NodeType *node;
@@ -653,21 +705,10 @@ int vogal_manipulation::writeData(CursorType * cursor, RidCursorType * rid, Data
 	BlockOffset * neighbor;
 
 	// Inicialização das variáveis
-	// TODO: Arrumar cálculo do espaço necessário pois valores numéricos estão sendo calculados com seu tamanho máximo e não com seu tamanho real
-	// 		 causando desperdício no bloco.
 	if (data) {
 		block = data->column->block;
-		neededSpace = 
-			m_Handler->getStorage()->bytesNeeded(sizeof(BlockOffset)) + // Ponteiro bloco esquerda
-			m_Handler->getStorage()->bytesNeeded(data->usedSize) + // Dado chave
-			m_Handler->getStorage()->bytesNeeded(sizeof(rid->id)); // RID
-			
 	} else {
 		block = cursor->table->block;
-		neededSpace =
-			m_Handler->getStorage()->bytesNeeded(sizeof(BlockOffset)) + // Ponteiro bloco esquerda
-			m_Handler->getStorage()->bytesNeeded(sizeof(rid->id)) + // RID
-			vlCount(rid->dataList) * m_Handler->getStorage()->bytesNeeded(sizeof(BlockOffset)) * 2; // Deslocamentos!!!
 	}
 
 	// Procura o dado mais próximo
@@ -677,7 +718,6 @@ int vogal_manipulation::writeData(CursorType * cursor, RidCursorType * rid, Data
 	if (info) {
 		offset = info->offset;
 		block = info->findedBlock;
-
 		// Reorganizar deslocamentos dos rids a direita (se estivar gravando um dado)
 		// TODO: Otimizar para fazer todas as operações em memória e gravar em disco apenas uma vez
 		if (data && offset < vlCount(block->nodesList)) {
@@ -692,13 +732,6 @@ int vogal_manipulation::writeData(CursorType * cursor, RidCursorType * rid, Data
 
 	} else {
 		offset = 0;
-		neededSpace += m_Handler->getStorage()->bytesNeeded(sizeof(BlockOffset)); // Ponteiro bloco direita
-	}
-
-	// Valida se o espaço livre do bloco é consistente
-	if (block->freeSpace < 0 || block->freeSpace > C_BLOCK_SIZE - sizeof(BlockHeaderType)) {
-		ERROR("Erro ao calular espaço disponível no bloco. Fora da faixa permitida");
-		goto freeWriteData;
 	}
 
 	// Cria novo nodo e insere no local adequado
@@ -723,24 +756,14 @@ int vogal_manipulation::writeData(CursorType * cursor, RidCursorType * rid, Data
 		vlInsert(block->offsetsList, neighbor, offset + 1);
 	}
 
-	if (neededSpace > block->freeSpace) {
-		// ################################################
-
-		// Fudeu!!! Tratar SPLIT !!!
-		// ################################################
-		ERROR("AINDA NÃO FEITO!!!!!!");
+	if (!updateBlockBuffer(cursor, block)) {
+		ERROR("Erro ao atualizar o buffer do bloco!");
 		goto freeWriteData;
-		
-	} else {
-		if (!updateBlockBuffer(cursor, block)) {
-			ERROR("Erro ao atualizar o buffer do bloco!");
-			goto freeWriteData;
-		}
+	}
 
-		if (!m_Handler->getStorage()->writeBlock(block)) {
-			ERROR("Erro ao gravar bloco de dados!");
-			goto freeWriteData;
-		}
+	if (!m_Handler->getStorage()->writeBlock(block)) {
+		ERROR("Erro ao gravar bloco de dados!");
+		goto freeWriteData;
 	}
 
 	ret = true;
@@ -837,51 +860,73 @@ int vogal_manipulation::fetch(FilterCursorType * filter){
 	DBUG_ENTER("vogal_manipulation::fetch");
 
 	int ret = false;
-
 	if (!filter || !filter->cursor || !filter->cursor->table || !filter->cursor->table->block) {
 		ERROR("Cursor de filtro inválido para efetuar o fetch!");
 		goto freeFetch;
 	}
-
 	filter->fetch = NULL;
 
-	if (filter->empty) {
-		DBUG_PRINT("INFO", ("Cursor no fim dos dados!"));
-		ret = true;
-		goto freeFetch;
-	}
+	if (filter->notFound)
+		goto fetchEmpty;
 
-	if (!filter->opened) {
-		// Obtém o rid do dado a ser localizado
-		filter->infoData = findNearest(filter->cursor, NULL, filter->data, filter->data->column->block);
-		if (!filter->infoData || !filter->infoData->findedNode) {
-			ERROR("Erro ao tentar localizar o dado!");
-			goto freeFetch;
+	if (filter->data) {
+		if (!filter->opened) {
+			// Obtém o rid do dado a ser localizado
+			filter->infoData = findNearest(filter->cursor, NULL, filter->data, filter->data->column->block);
+			if (!filter->infoData) {
+				ERROR("Erro ao tentar localizar o dado!");
+				goto freeFetch;
+			}
+			if (!filter->infoData->findedNode)
+				goto fetchEmpty;
+			filter->opened = true;
+		} else {
+			// Varredura da árvore
+			if (!filter->infoData->findedBlock) {
+				ERROR("Nenhum bloco aberto na busca inicial. Impossível continuar!");
+				goto freeFetch;
+			}
+
+			if (!comparison(filter->infoData, filter->cursor, NULL, filter->data, filter->infoData->offset+1)) {
+				ERROR("Erro durante o processo de comparação dos dados para obtenção do próximo fetch!");
+				goto freeFetch;
+			}
 		}
-		filter->opened = true;
+
 	} else {
-		// Varredura da árvore
-		if (!filter->infoData->findedBlock) {
-			ERROR("Nenhum bloco aberto na busca inicial. Impossível continuar!");
-			goto freeFetch;
-		}
+		if (!filter->opened) {
+			// Obtém o rid do dado a ser localizado
+			filter->infoFetch = findNearest(filter->cursor, NULL, NULL, filter->cursor->table->block);
+			if (!filter->infoFetch) {
+				ERROR("Erro ao tentar localizar o rid!");
+				goto freeFetch;
+			}
+			if (!filter->infoFetch->findedNode)
+				goto fetchEmpty;
+			filter->opened = true;
+		} else {
+			// Varredura da árvore
+			if (!filter->infoFetch->findedBlock) {
+				ERROR("Nenhum bloco aberto na busca inicial. Impossível continuar!");
+				goto freeFetch;
+			}
 
-		if (!comparison(filter->infoData, filter->cursor, NULL, filter->data, filter->infoData->offset+1)) {
-			ERROR("Erro durante o processo de comparação dos dados para obtenção do próximo fetch!");
-			goto freeFetch;
+			if (!comparison(filter->infoFetch, filter->cursor, NULL, NULL, filter->infoFetch->offset+1)) {
+				ERROR("Erro durante o processo de comparação dos dados para obtenção do próximo fetch!");
+				goto freeFetch;
+			}
 		}
 	}
 
 	// Verifica grau de identificação, no caso, tem que ser igual!
-	if (!filter->infoData->findedNode || filter->infoData->comparison) {
-		DBUG_PRINT("INFO", ("Dado não encontrado"));
-		filter->empty = true;
-		ret = true;
-		goto freeFetch;
+	if (filter->infoData) {
+		if (!filter->infoData->findedNode || filter->infoData->comparison)
+			goto fetchEmpty;
+
+		// Obtém as localizações de todos os dados do rid localizado
+		filter->infoFetch = findNearest(filter->cursor, filter->infoData->findedNode->rid, NULL, filter->cursor->table->block);
 	}
 
-	// Obtém as localizações de todos os dados do rid localizado
-	filter->infoFetch = findNearest(filter->cursor, filter->infoData->findedNode->rid, NULL, filter->cursor->table->block);
 	if (!filter->infoFetch || !filter->infoFetch->findedNode) {
 		ERROR("Erro ao tentar localizar o rid!");
 		goto freeFetch;
@@ -901,8 +946,16 @@ int vogal_manipulation::fetch(FilterCursorType * filter){
 			goto freeFetch;
 		}
 
+	filter->count ++;
+
 	ret = true;
 
 freeFetch:
 	DBUG_RETURN(ret);
+
+fetchEmpty:
+	DBUG_PRINT("INFO", ("Cursor no fim dos dados!"));
+	filter->notFound = true;
+	DBUG_RETURN(true);
+
 }

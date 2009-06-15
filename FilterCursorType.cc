@@ -3,13 +3,12 @@
 
 FilterCursorType::FilterCursorType() {
 	DBUG_ENTER("FilterCursorType::FilterType");
-	opened = false;
-	empty = false;
 	cursor = NULL;
 	data = NULL;
-	fetch = NULL;
 	infoData = NULL;
 	infoFetch = NULL;
+	cursorOwner = false;
+	reset();
 	DBUG_LEAVE;
 }
 
@@ -17,13 +16,30 @@ FilterCursorType::~FilterCursorType() {
 	DBUG_ENTER("FilterCursorType::~FilterType");
 	if (data)
 		data->~DataCursorType();
-	if (cursor)
-		cursor->~CursorType();
+	if (cursorOwner)
+		if (cursor)
+			cursor->~CursorType();
+	reset();
+	DBUG_LEAVE;
+}
+
+void FilterCursorType::reset() {
+	DBUG_ENTER("FilterCursorType::reset");
+	
+	fetch = NULL;
 	/*if (fetch)
 		fetch->~RidCursorType();*/ // Liberado abaixo, no infoFetch
-	if (infoData)
+	opened = false;
+	notFound = false;
+ 	count = 0;
+	if (infoData) {
 		infoData->~SearchInfoType();
-	if (infoFetch)
+		infoData = NULL;
+	}
+	if (infoFetch) {
 		infoFetch->~SearchInfoType();
+		infoFetch = NULL;
+	}
+
 	DBUG_LEAVE;
 }
