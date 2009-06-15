@@ -5,8 +5,6 @@ vogal_cache::vogal_cache(vogal_handler * handler){
 	DBUG_ENTER("vogal_cache::vogal_cache");
 	
 	m_Handler = handler;
-	m_Objects = NULL;
-	m_Columns = NULL;
 	m_FreeBlocks = llNew();
 	m_LockedBlocks = llNew();
 
@@ -18,10 +16,6 @@ vogal_cache::~vogal_cache(){
 	
 	llFree(&m_FreeBlocks);
 	llFree(&m_LockedBlocks);
-	if (m_Objects)
-		m_Objects->~ObjectCursorType();
-	if (m_Columns)
-		m_Columns->~ObjectCursorType();
 	
 	DBUG_LEAVE;
 }
@@ -102,18 +96,10 @@ int vogal_cache::addFreeBlock(BlockOffset block) {
 // TODO: Melhorar mecanismo de cache dos objetos do metadados!
 ObjectCursorType *vogal_cache::openObjects() {
 	DBUG_ENTER("vogal_cache::openObjects");
-	if (!m_Objects) {
-		m_Objects = m_Handler->getDefinition()->openTable(C_OBJECTS);
-		m_Objects->dictionary = true;
-	}
-	DBUG_RETURN( m_Objects );
+	DBUG_RETURN( m_Handler->getDefinition()->openTable(C_OBJECTS) );
 }
 
 ObjectCursorType *vogal_cache::openColumns() {
 	DBUG_ENTER("vogal_cache::openColumns");
-	if (!m_Columns) {
-		m_Columns = m_Handler->getDefinition()->openTable(C_COLUMNS);
-		m_Columns->dictionary = true;
-	}
-	DBUG_RETURN( m_Columns );
+	DBUG_RETURN( m_Handler->getDefinition()->openTable(C_COLUMNS) );
 }

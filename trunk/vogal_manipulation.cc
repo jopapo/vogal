@@ -142,7 +142,7 @@ BigNumber vogal_manipulation::nextRid(CursorType * cursor) {
 	DBUG_RETURN(id + 1);
 }
 
-BigNumber vogal_manipulation::insertData(CursorType* cursor, ValueListRoot* data) {
+BigNumber vogal_manipulation::insertData(CursorType* cursor, ValueListRoot* dataList) {
 	DBUG_ENTER("vogal_manipulation::insertData");
 
 	RidCursorType * newRid = NULL;
@@ -152,11 +152,41 @@ BigNumber vogal_manipulation::insertData(CursorType* cursor, ValueListRoot* data
 		goto freeInsertData;
 	}
 
+	if (!dataList) {
+		ERROR("Impossível inserir nada!");
+		goto freeInsertData;
+	}
+
 	// Cria registro RID
 	newRid = new RidCursorType();
 	newRid->id = nextRid(cursor);
-	newRid->dataList = data;
+	newRid->dataList = vlNew(true);
+
+	// Reorganiza lista de dados para bater com a lista de colunas
+	dataList->owner = false;
+	for (int i = 0; i < vlCount(cursor->table->colsList); i++) {
+		ColumnCursorType * column = (ColumnCursorType *) vlGet(cursor->table->colsList, i);
+		DataCursorType * data = NULL;
+		int d;
+		for (d = 0; d < vlCount(dataList); d++) {
+			data = (DataCursorType *) vlGet(dataList, d);
+			if (!strcmp(column->name, data->column->name))
+				break;
+			data = NULL;
+		}
+		if (!data) {
+			ERROR("Ainda não são permitidos campos nulos!");
+			goto freeInsertData;
+		}
+		vlAdd(newRid->dataList, data);
+		vlRemove(dataList, d);
+	}
 	
+	if (vlCount(dataList) > 0) {
+		ERROR("Dados de campos inválido para inclusão!");
+		goto freeInsertData;
+	}
+
 	if (!writeRid(cursor, newRid)) {
 		ERROR("Erro ao gravar RID");
 		goto freeInsertData;
@@ -415,7 +445,7 @@ continueWhileComparison:
 		}
 
 	count = vlCount(info->findedBlock->nodesList);
-	if (count) {
+	if (startingOffset < count) {
 		for (info->offset = startingOffset; info->offset < count; info->offset++) {
 			info->findedNode = (NodeType *) vlGet(info->findedBlock->nodesList, info->offset);
 
@@ -429,7 +459,9 @@ continueWhileComparison:
 							info->comparison = DIFF((*(BigNumber*)data2find->content), (*(BigNumber*)info->findedNode->data->content));
 							break;
 						case VARCHAR:
-							info->comparison = strncmp((char *) data2find->content, (char *) info->findedNode->data->content, MIN(data2find->usedSize, info->findedNode->data->usedSize));
+							// Não é necessário definir tamanho pois teminam em \0
+							info->comparison = strcmp((char *) data2find->content, (char *) info->findedNode->data->content); 
+							//info->comparison = strncmp((char *) data2find->content, (char *) info->findedNode->data->content, MIN(data2find->allocSize, info->findedNode->data->allocSize)); 
 							break;
 						default:
 							ERROR("Comparação não preparada para o tipo!");
@@ -618,7 +650,7 @@ int vogal_manipulation::updateBlockBuffer(CursorType * cursor, BlockCursorType *
 				// Se excluiu algum antes, atualiza pais
 				if (!node->inserted && (deleted || added)) {
 					// TODO: Otimizar para fazer todas as operações em memória e gravar em disco apenas uma vez
-					if (!updateLocation(cursor, node, node->data->blockId, node->data->blockOffset)) {
+					if (!updateLocation(cursor, node)) {
 						ERROR("Erro ao atualizar o deslocamento das colunas do bloco!");
 						goto freeUpdateBlockBuffer;
 					}
@@ -654,7 +686,7 @@ int vogal_manipulation::writeDataCursor(GenericPointer* dest, DataCursorType * d
 	DBUG_RETURN( m_Handler->getStorage()->writeAnyData(dest, (GenericPointer)data->content, data->column->type) );
 }
 
-int vogal_manipulation::updateLocation(CursorType * cursor, NodeType * node, BlockOffset blockId, BlockOffset blockOffset) {
+int vogal_manipulation::updateLocation(CursorType * cursor, NodeType * node) {
 	DBUG_ENTER("vogal_manipulation::updateLocation");
 
 	// Declarações
@@ -671,8 +703,8 @@ int vogal_manipulation::updateLocation(CursorType * cursor, NodeType * node, Blo
 			goto freeUpdateLocation;
 		}
 		
-		data->blockId = blockId;
-		data->blockOffset = blockOffset;
+		data->blockId = node->data->blockId;
+		data->blockOffset = node->data->blockOffset;
 
 		// TODO: CUIDADO!!! Nunca encher muito o bloco pois na atualização do deslocamento normalmente se ocupam mais ou menos blocos na
 		//		hora de escrevê-lo. Portanto, nunca encher o bloco por completo
@@ -917,10 +949,13 @@ int vogal_manipulation::fetch(FilterCursorType * filter){
 		filter->infoFetch = findNearest(filter->cursor, filter->infoData->findedNode->rid, NULL, filter->cursor->table->block);
 	}
 
-	if (!filter->infoFetch || !filter->infoFetch->findedNode) {
+ 	if (!filter->infoFetch) {
 		ERROR("Erro ao tentar localizar o rid!");
 		goto freeFetch;
 	}
+
+	if (!filter->infoFetch->findedNode)
+		goto fetchEmpty;
 
 	filter->fetch = filter->infoFetch->findedNode->rid;
 	if (!filter->fetch || !filter->fetch->dataList) {

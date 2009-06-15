@@ -84,6 +84,7 @@ static VOGAL_SHARE *get_share(const char *table_name, TABLE *table)
     share->use_count=0;
     share->table_name_length=length;
     share->table_name=tmp_name;
+    strmov(share->table_name,table_name);
 
 	share->cursor = vogal->getManipulation()->openCursor(vogal->getDefinition()->openTable(share->table_name));
 	if (!share->cursor) {
@@ -91,8 +92,7 @@ static VOGAL_SHARE *get_share(const char *table_name, TABLE *table)
 		goto error;
 	}
 	share->filter = NULL;
-
-    strmov(share->table_name,table_name);
+	
     if (my_hash_insert(&vogal_open_tables, (uchar*) share))
       goto error;
     thr_lock_init(&share->lock);
@@ -299,7 +299,6 @@ int ha_vogal::write_row(uchar *buf) {
 	my_bitmap_map *org_bitmap= dbug_tmp_use_all_columns(table, table->read_set);
 
 	// Inicia criação dos dados da tabela
-	// Obs: Está sendo considerado que a ordem das colunas no MySQL é a mesma que no Vogal
 	for (Field ** field = table->field; *field; field++) {
 		if (!bitmap_is_set(table->read_set, (*field)->field_index))
 			continue;
@@ -403,26 +402,32 @@ int ha_vogal::vogal2mysql(CursorType * cursor, RidCursorType * rid) {
 	DBUG_ENTER("ha_vogal::vogal2mysql");
 
 	int ret = false;
+	ColumnCursorType * column;
 	DataCursorType * data;
 	
 	// Habilita campos para escrita
 	my_bitmap_map *org_bitmap= dbug_tmp_use_all_columns(table, table->write_set);
 
-	// Obs: Está sendo considerado que a ordem das colunas no MySQL é a mesma que no Vogal
 	for (Field ** field = table->field; *field; field++) {
 		if (!bitmap_is_set(table->write_set, (*field)->field_index))
 			continue;
-		data = (DataCursorType*) vlGet(rid->dataList, (*field)->field_index);
+		column = vogal->getDefinition()->findColumn(cursor->table, const_cast<char*>((*field)->field_name));
+		if (!column) {
+			ERROR("Coluna da tabela não pode ser localizada para ler linha!");
+			goto error;
+		}
+		data = (DataCursorType*) vlGet(rid->dataList, column->getId());
 		if (!data) {
 			ERROR("Dado da coluna da tabela não pode ser localizada para ler linha!");
 			goto error;
 		}
+		(*field)->set_notnull();
 		switch (data->column->type) {
 			case VARCHAR:
-				(*field)->store( (char*) data->content, data->usedSize, NULL);
+				(*field)->store((char*)data->content, data->usedSize, (*field)->charset());
 				break;
 			case NUMBER:
-				(*field)->store( (*(BigNumber*) data->content) );
+				(*field)->store((*(BigNumber*) data->content), true);
 				break;
 			default:
 				ERROR("Não preparado para tipo!");

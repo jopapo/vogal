@@ -33,9 +33,6 @@ private:
 	LinkedListRootType *m_FreeBlocks;
 	LinkedListRootType *m_LockedBlocks;
 
-	ObjectCursorType *m_Objects;
-	ObjectCursorType *m_Columns;
-
 };
 
 #endif

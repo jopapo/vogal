@@ -27,9 +27,9 @@ public:
 	int comparison(SearchInfoType * info, CursorType * cursor, RidCursorType * rid2find, DataCursorType * data2find, int startingOffset = 0);
 	SearchInfoType * findNearest(CursorType * cursor, RidCursorType * rid2find, DataCursorType * data2find, BlockCursorType * rootBlock);
 	int updateBlockBuffer(CursorType * cursor, BlockCursorType * block, int removed = 0);
-	int updateLocation(CursorType * cursor, NodeType * node, BlockOffset blockId, BlockOffset blockOffset);
+	int updateLocation(CursorType * cursor, NodeType * node);
 	
-	BigNumber insertData(CursorType* cursor, ValueListRoot* data);
+	BigNumber insertData(CursorType* cursor, ValueListRoot* dataList);
 	int writeData(CursorType * cursor, RidCursorType * rid, DataCursorType * data);
 	int writeRid(CursorType * cursor, RidCursorType * rid);
 	int writeDataCursor(GenericPointer* dest, DataCursorType * data);

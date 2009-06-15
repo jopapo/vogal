@@ -555,6 +555,7 @@ int vogal_definition::newTable(char* name, PairListRoot * columns){
 	// Verifica se a tabela existe
     ObjectCursorType * table = openTable(name); 
 	if (table) {
+		ERROR("Tabela já existe!");
 		table->~ObjectCursorType();
 		DBUG_RETURN(false);
 	}
@@ -640,7 +641,7 @@ int vogal_definition::dropTable(char* name) {
 		}
 		for (int io = 0; io < vlCount(blockCur->offsetsList); io++) {
 			blockAux = (BlockOffset *) vlGet(blockCur->offsetsList, io);
-			if (blockAux) {
+			if (blockAux && (*blockAux)) {
 				BlockOffset * temp = new BlockOffset();
 				(*temp) = (*blockAux);
 				vlAdd(blockStack, temp);
