@@ -222,13 +222,13 @@ int vogal_storage::readDataSize(GenericPointer* src, BigNumber* dest){
 
 	(*dest) = 0; // Zera geral para não interferir na operação lógica
 	bool more = false;
+	int shift = 0;
+	int aux;
 	do {
 		VariableSizeType * var_p = (VariableSizeType *)(*src);
-		(*dest) |= var_p->size;
+		(*dest) |= var_p->size << (7*shift++);
 		more = var_p->more;
 		(*src)+=sizeof(VariableSizeType);
-		if (more)
-			(*dest) <<= 7; // Desloca os bits 7 para esquerda
 	} while (more);
 
 	DBUG_RETURN(true);

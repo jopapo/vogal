@@ -354,7 +354,7 @@ int vlInsert(ValueListRoot* root, ListValueType value, int index) {
 	DBUG_RETURN(true);
 }
 
-int vlRemove(ValueListRoot* root, int index) {
+int vlRemove(ValueListRoot* root, int index, bool defaultOwnership) {
 	DBUG_ENTER("vlRemove");
 	if (!root)
 		DBUG_RETURN(false);
@@ -364,7 +364,7 @@ int vlRemove(ValueListRoot* root, int index) {
 	}
 	// Grava ponteiro do nó
 	ListValueType removed = root->root[index];
-	if (root->owner) // Remove se necessário
+	if (root->owner && defaultOwnership) // Remove se necessário
 		free(removed);
 	// Reorganiza lista
 	for (int i = index; i < root->count - 1; i++)
