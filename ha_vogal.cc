@@ -302,6 +302,8 @@ int ha_vogal::write_row(uchar *buf) {
 	for (Field ** field = table->field; *field; field++) {
 		if (!bitmap_is_set(table->read_set, (*field)->field_index))
 			continue;
+		if ((*field)->is_null())
+			continue;
 		data = new DataCursorType();
 		data->column = vogal->getDefinition()->findColumn(share->cursor->table, const_cast<char*>((*field)->field_name));
 		if (!data->column) {
@@ -445,7 +447,7 @@ int ha_vogal::vogal2mysql(CursorType * cursor, RidCursorType * rid) {
 				(*field)->store((char*)data->content, data->usedSize, (*field)->charset());
 				break;
 			case NUMBER:
-				(*field)->store((*(BigNumber*) data->content), true);
+				(*field)->store((*(BigNumber*) data->content), false);
 				break;
 			default:
 				ERROR("Não preparado para tipo!");
