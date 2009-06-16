@@ -29,7 +29,7 @@ public:
 	int updateBlockBuffer(CursorType * cursor, BlockCursorType * block, int removed = 0);
 	int updateLocation(CursorType * cursor, NodeType * node);
 	
-	BigNumber insertData(CursorType* cursor, ValueListRoot* dataList);
+	BigNumber insertData(CursorType* cursor, ValueListRoot* dataList, BigNumber ridId = 0);
 	int writeData(CursorType * cursor, RidCursorType * rid, DataCursorType * data);
 	int writeRid(CursorType * cursor, RidCursorType * rid);
 	int writeDataCursor(GenericPointer* dest, DataCursorType * data);
