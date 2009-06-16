@@ -12,8 +12,7 @@ public:
 
 	char 		    *name;
 	ValueListRoot   *colsList; // <ColumnCursorType>
-	BlockCursorType *block;
-	//bool		     dictionary;
+	BlockOffset      blockId;
 	
 };
 

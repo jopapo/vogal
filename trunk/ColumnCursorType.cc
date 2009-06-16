@@ -7,17 +7,13 @@ ColumnCursorType::ColumnCursorType(int id) {
 	m_Id = id;
 	name = NULL;
 	type = UNKNOWN;
-	block = NULL;
+	blockId = 0;
 	
 	DBUG_LEAVE;
 }
 
 ColumnCursorType::~ColumnCursorType() {
 	DBUG_ENTER("ColumnCursorType::~ColumnCursorType");
-
-	if (block)
-		block->~BlockCursorType();
-		
 	DBUG_LEAVE;
 }
 

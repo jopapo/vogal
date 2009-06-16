@@ -25,7 +25,7 @@ public:
 
 	NodeType * parseRecord(CursorType * cursor, ColumnCursorType * column, BlockCursorType * block, GenericPointer * offset);
 	int comparison(SearchInfoType * info, CursorType * cursor, RidCursorType * rid2find, DataCursorType * data2find, int startingOffset = 0);
-	SearchInfoType * findNearest(CursorType * cursor, RidCursorType * rid2find, DataCursorType * data2find, BlockCursorType * rootBlock);
+	SearchInfoType * findNearest(CursorType * cursor, RidCursorType * rid2find, DataCursorType * data2find, BlockOffset rootBlock);
 	int updateBlockBuffer(CursorType * cursor, BlockCursorType * block, int removed = 0);
 	int updateLocation(CursorType * cursor, NodeType * node);
 	

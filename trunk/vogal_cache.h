@@ -8,7 +8,6 @@ class vogal_cache; // Necessário pelo interrelacionamento com a vogal_handler
 #include "ObjectCursorType.h"
 #include "vogal_handler.h"
 
-
 class vogal_cache
 {
 public:
@@ -26,7 +25,7 @@ public:
 	
 	ObjectCursorType *openObjects();
 	ObjectCursorType *openColumns();
-	
+
 private:
 	vogal_handler *m_Handler;
 
