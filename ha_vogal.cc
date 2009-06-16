@@ -338,7 +338,7 @@ int ha_vogal::write_row(uchar *buf) {
 
 	rid = vogal->getManipulation()->insertData(share->cursor, dataList);
 	if (!rid) {
-		ERROR("Erro ao inserir estrutura de dados da tabela OBJS");
+		ERROR("Erro ao inserir estrutura de dados da tabela nova");
 		goto error;
 	}
 
@@ -350,19 +350,32 @@ error:
 	DBUG_RETURN(error);
 }
 
-// ################
 int ha_vogal::update_row(const uchar *old_data, uchar *new_data)
 {
+	DBUG_ENTER("ha_vogal::update_row");
 
-  DBUG_ENTER("ha_vogal::update_row");
-  DBUG_RETURN(HA_ERR_WRONG_COMMAND);
+	// Deleta o registro
+	int error = delete_row(old_data);
+	if (error)
+		DBUG_RETURN(error);
+
+	//Reinsere
+	DBUG_RETURN(write_row(new_data));
+
 }
 
-// ################
 int ha_vogal::delete_row(const uchar *buf)
 {
-  DBUG_ENTER("ha_vogal::delete_row");
-  DBUG_RETURN(HA_ERR_WRONG_COMMAND);
+	DBUG_ENTER("ha_vogal::delete_row");
+
+	if (!vogal->getManipulation()->removeFetch(share->filter)) {
+		ERROR("Erro ao excluir colunas da tabela!");
+		DBUG_RETURN(HA_ERR_INTERNAL_ERROR);
+	} else {
+		share->filter->reset();
+	}
+
+	DBUG_RETURN(0);
 }
 
 int ha_vogal::rnd_init(bool scan) {
@@ -484,7 +497,7 @@ int ha_vogal::rnd_pos(uchar *buf, uchar *pos) {
 	rid = new RidCursorType();
 	rid->id = my_get_ptr(pos, ref_length);
 
-	info = vogal->getManipulation()->findNearest(share->filter->cursor, rid, NULL, share->filter->cursor->table->block);
+	info = vogal->getManipulation()->findNearest(share->filter->cursor, rid, NULL, share->filter->cursor->table->blockId);
 	if (!info || info->comparison) {
 		ERROR("Erro durante a busca do registro na determinada posição!");
 		error = HA_ERR_KEY_NOT_FOUND;

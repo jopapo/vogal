@@ -206,15 +206,13 @@ int vogal_storage::readSizedNumber(GenericPointer* src, BigNumber* number){
 
 int vogal_storage::writeDataSize(GenericPointer* dest, BigNumber size){
 	DBUG_ENTER("vogal_storage::writeDataSize");
-	
 	do {
 		VariableSizeType * var_p = (VariableSizeType *)(*dest);
 		var_p->size = size & (unsigned char)127; // Tamanho máximo
 		size >>= 7; // Desloca 7 bits pra direita
 		var_p->more = size > 0;
 		(*dest)+=sizeof(VariableSizeType);
-	} while (size);
-	
+	} while (size > 0);
 	DBUG_RETURN(true);
 }
 

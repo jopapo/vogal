@@ -132,7 +132,7 @@ BigNumber vogal_manipulation::nextRid(CursorType * cursor) {
 	maxRid->id = -1; // Não aceita negativo, portanto se tornará o maior valor possível
 
 	// Busca o RID mais próximo
-	SearchInfoType * info = findNearest(cursor, maxRid, NULL, cursor->table->block);
+	SearchInfoType * info = findNearest(cursor, maxRid, NULL, cursor->table->blockId);
 	if (info && info->findedNode && info->findedNode->rid) {
 		id = info->findedNode->rid->id;
 		info->~SearchInfoType();
@@ -208,11 +208,38 @@ int vogal_manipulation::removeFetch(FilterCursorType * filter) {
 	DataCursorType * data;
 	BlockCursorType * block = NULL;
 	NodeType * node;
+	ValueListRoot * dataList = NULL;
+
+	if (!filter->infoFetch || !filter->infoFetch->findedNode) {
+		ERROR("Erro ao localizar nodo específico do RID!");
+		goto freeRemoveFetch;
+	}
+	filter->infoFetch->findedNode->deleted = true;
+
+	// Troca o dono da lista de dados
+	dataList = filter->fetch->dataList;
+	filter->fetch->dataList = NULL;
+
+	// Atualiza e grava
+	if (!updateBlockBuffer(filter->cursor, filter->infoFetch->findedBlock, 1)) {
+		ERROR("Erro ao atualizar o buffer do bloco dos rids!");
+		goto freeRemoveFetch;
+	}
+
+	if (!m_Handler->getStorage()->writeBlock(filter->infoFetch->findedBlock)) {
+		ERROR("Erro ao gravar bloco dos rids!");
+		goto freeRemoveFetch;
+	}
+
+	ret = true;
 
 	// Atualiza dados
-	for (int i = 0; i < vlCount(filter->fetch->dataList); i++) {
-		data = (DataCursorType *) vlGet(filter->fetch->dataList, i);
+	for (int i = 0; i < vlCount(dataList); i++) {
+		data = (DataCursorType *) vlGet(dataList, i);
 
+		if (block)
+			block->~BlockCursorType();
+			
 		block = m_Handler->getStorage()->openBlock(data->blockId);
 		if (!block) {
 			ERROR("Erro ao abrir bloco para remover dado da coluna!");
@@ -244,25 +271,6 @@ int vogal_manipulation::removeFetch(FilterCursorType * filter) {
 		
 	}
 
-	if (!filter->infoFetch || !filter->infoFetch->findedNode) {
-		ERROR("Erro ao localizar nodo específico do RID!");
-		goto freeRemoveFetch;
-	}
-	filter->infoFetch->findedNode->deleted = true;
-
-	// Atualiza e grava
-	if (!updateBlockBuffer(filter->cursor, filter->infoFetch->findedBlock, 1)) {
-		ERROR("Erro ao atualizar o buffer do bloco dos rids!");
-		goto freeRemoveFetch;
-	}
-
-	if (!m_Handler->getStorage()->writeBlock(filter->infoFetch->findedBlock)) {
-		ERROR("Erro ao gravar bloco dos rids!");
-		goto freeRemoveFetch;
-	}
-
-	ret = true;
-
 freeRemoveFetch:
 	if (block)
 		block->~BlockCursorType();
@@ -278,7 +286,7 @@ CursorType * vogal_manipulation::openCursor(ObjectCursorType * object){
 	CursorType *cursor = new CursorType();
 	cursor->table = object;
 
-	if (!cursor->table || !cursor->table->block) {
+	if (!cursor->table) {
 		ERROR("Informações incompletas para definição do cursor!");
 		goto freeOpenCursor;
 	}
@@ -505,14 +513,14 @@ freeComparison:
 	DBUG_RETURN(ret);
 }
 
-SearchInfoType * vogal_manipulation::findNearest(CursorType * cursor, RidCursorType * rid2find, DataCursorType * data2find, BlockCursorType * rootBlock) {
+SearchInfoType * vogal_manipulation::findNearest(CursorType * cursor, RidCursorType * rid2find, DataCursorType * data2find, BlockOffset rootBlock) {
 	DBUG_ENTER("vogal_manipulation::findNearest");
 
 	// Declara
 	SearchInfoType * info = new SearchInfoType();
-	info->rootBlock = rootBlock;
+	info->rootBlock = m_Handler->getStorage()->openBlock(rootBlock);
 	info->blocksList = vlNew(true);
-	info->findedBlock = rootBlock;
+	info->findedBlock = info->rootBlock;
 
 	if (!comparison(info, cursor, rid2find, data2find)) {
 		ERROR("Erro durante o processo de comparação!");
@@ -694,7 +702,7 @@ int vogal_manipulation::updateLocation(CursorType * cursor, NodeType * node) {
 	SearchInfoType * info;
 
 	// Se não achou em memória, faz a busca na base
-	info = findNearest(cursor, node->rid, NULL, cursor->table->block);
+	info = findNearest(cursor, node->rid, NULL, cursor->table->blockId);
 	if (info && info->findedNode && !info->comparison) {
 		// Procura a coluna com offset atualizado
 		DataCursorType * data = (DataCursorType *) vlGet(info->findedNode->rid->dataList, node->data->column->getId());
@@ -737,27 +745,16 @@ int vogal_manipulation::writeData(CursorType * cursor, RidCursorType * rid, Data
 
 	// Declaração das variáveis
 	int ret = false;
-	BlockCursorType *block;
 	SearchInfoType *info = NULL;
 	NodeType *node;
-	int offset;
 	BlockOffset * neighbor;
 
-	// Inicialização das variáveis
-	if (data)
-		block = data->column->block;
-	else
-		block = cursor->table->block;
-
 	// Procura o dado mais próximo
-	info = findNearest(cursor, rid, data, block);
-
-	// Se achou, verifica posição de inserção
-	if (info) {
-		offset = info->offset;
-		block = info->findedBlock;
-	} else
-		offset = 0;
+	info = findNearest(cursor, rid, data, data?data->column->blockId:cursor->table->blockId);
+	if (!info) { 
+		ERROR("Erro ao obter bloco para gravação do dado!");
+		goto freeWriteData;
+	}
 
 	// Cria novo nodo e insere no local adequado
 	node = new NodeType();
@@ -765,25 +762,25 @@ int vogal_manipulation::writeData(CursorType * cursor, RidCursorType * rid, Data
 	node->data = data;
 	node->inserted = true;
 	
-	vlInsert(block->nodesList, node, offset);
+	vlInsert(info->findedBlock->nodesList, node, info->offset);
 
 	// Esquerda e direita apontando para o vazio!
 	neighbor = new BlockOffset();
 	(*neighbor) = 0;
-	vlInsert(block->offsetsList, neighbor, offset);
+	vlInsert(info->findedBlock->offsetsList, neighbor, info->offset);
 	// Somente insere vizinho da direita se for o primeiro rid do bloco
-	if (vlCount(block->offsetsList) == 1) {
+	if (vlCount(info->findedBlock->offsetsList) == 1) {
 		neighbor = new BlockOffset();
 		(*neighbor) = 0;
-		vlInsert(block->offsetsList, neighbor, offset + 1);
+		vlInsert(info->findedBlock->offsetsList, neighbor, info->offset + 1);
 	}
 
-	if (!updateBlockBuffer(cursor, block)) {
+	if (!updateBlockBuffer(cursor, info->findedBlock)) {
 		ERROR("Erro ao atualizar o buffer do bloco!");
 		goto freeWriteData;
 	}
 
-	if (!m_Handler->getStorage()->writeBlock(block)) {
+	if (!m_Handler->getStorage()->writeBlock(info->findedBlock)) {
 		ERROR("Erro ao gravar bloco de dados!");
 		goto freeWriteData;
 	}
@@ -882,7 +879,7 @@ int vogal_manipulation::fetch(FilterCursorType * filter){
 	DBUG_ENTER("vogal_manipulation::fetch");
 
 	int ret = false;
-	if (!filter || !filter->cursor || !filter->cursor->table || !filter->cursor->table->block) {
+	if (!filter || !filter->cursor || !filter->cursor->table) {
 		ERROR("Cursor de filtro inválido para efetuar o fetch!");
 		goto freeFetch;
 	}
@@ -894,7 +891,7 @@ int vogal_manipulation::fetch(FilterCursorType * filter){
 	if (filter->data) {
 		if (!filter->opened) {
 			// Obtém o rid do dado a ser localizado
-			filter->infoData = findNearest(filter->cursor, NULL, filter->data, filter->data->column->block);
+			filter->infoData = findNearest(filter->cursor, NULL, filter->data, filter->data->column->blockId);
 			if (!filter->infoData) {
 				ERROR("Erro ao tentar localizar o dado!");
 				goto freeFetch;
@@ -918,7 +915,7 @@ int vogal_manipulation::fetch(FilterCursorType * filter){
 	} else {
 		if (!filter->opened) {
 			// Obtém o rid do dado a ser localizado
-			filter->infoFetch = findNearest(filter->cursor, NULL, NULL, filter->cursor->table->block);
+			filter->infoFetch = findNearest(filter->cursor, NULL, NULL, filter->cursor->table->blockId);
 			if (!filter->infoFetch) {
 				ERROR("Erro ao tentar localizar o rid!");
 				goto freeFetch;
@@ -946,7 +943,7 @@ int vogal_manipulation::fetch(FilterCursorType * filter){
 			goto fetchEmpty;
 
 		// Obtém as localizações de todos os dados do rid localizado
-		filter->infoFetch = findNearest(filter->cursor, filter->infoData->findedNode->rid, NULL, filter->cursor->table->block);
+		filter->infoFetch = findNearest(filter->cursor, filter->infoData->findedNode->rid, NULL, filter->cursor->table->blockId);
 	}
 
  	if (!filter->infoFetch) {
