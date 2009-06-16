@@ -8,6 +8,7 @@ ObjectCursorType::ObjectCursorType() {
 	name = NULL;
 	colsList = NULL;
 	blockId = 0;
+	ridNumber = 0;
 	
 	DBUG_LEAVE;
 }

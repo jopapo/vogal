@@ -13,6 +13,9 @@ public:
 	char 		    *name;
 	ValueListRoot   *colsList; // <ColumnCursorType>
 	BlockOffset      blockId;
+
+	// Necessário para atualização da localização quando necessário
+	BigNumber		 ridNumber;
 	
 };
 

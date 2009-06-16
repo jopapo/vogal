@@ -28,7 +28,7 @@ public:
 	SearchInfoType * findNearest(CursorType * cursor, RidCursorType * rid2find, DataCursorType * data2find, BlockOffset rootBlock);
 	int updateBlockBuffer(CursorType * cursor, BlockCursorType * block, int removed = 0, SearchInfoType * info = NULL);
 	int updateBlockOffset(CursorType * cursor, NodeType * node);
-	int blockSplit(CursorType * cursor, BlockCursorType * block, SearchInfoType * info, int validValues);
+	int blockSplit(CursorType * cursor, SearchInfoType * info, BlockCursorType * block, int validValues);
 	BigNumber neededSpace(BlockCursorType * block);
 
 	BigNumber insertData(CursorType* cursor, ValueListRoot* dataList, BigNumber ridId = 0);
