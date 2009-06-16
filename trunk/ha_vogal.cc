@@ -330,7 +330,7 @@ int ha_vogal::write_row(uchar *buf) {
 				break;
 			default:
 				ERROR("Não preparado para tipo!");
-				error = HA_ERR_INTERNAL_ERROR;
+				error = HA_ERR_UNSUPPORTED;
 				goto error;
 		}
 		vlAdd(dataList, data);
@@ -339,6 +339,7 @@ int ha_vogal::write_row(uchar *buf) {
 	rid = vogal->getManipulation()->insertData(share->cursor, dataList, m_UpdatedRid);
 	if (!rid) {
 		ERROR("Erro ao inserir estrutura de dados da tabela nova");
+		error = HA_ERR_INTERNAL_ERROR;
 		goto error;
 	}
 

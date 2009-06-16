@@ -485,6 +485,7 @@ ObjectCursorType * vogal_definition::openTable(char * tableName) {
 			break;
 		int check = 0;
 		ColumnCursorType * column = new ColumnCursorType(vlCount(table->colsList));
+		column->ridNumber = colsFilter->fetch->id;
 		for (int i = 0; i < vlCount(colsFilter->fetch->dataList); i++) {
 			DataCursorType * data = (DataCursorType *) vlGet(colsFilter->fetch->dataList, i);
 			if (!strcmp(data->column->name, C_NAME_KEY)) {

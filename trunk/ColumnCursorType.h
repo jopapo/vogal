@@ -14,10 +14,13 @@ public:
 	DataTypes	     type;
 	BlockOffset  	 blockId;
 
+	// Necessário para atualização da localização quando necessário
+	BigNumber		 ridNumber;
+
 	int getId();
 	
 private:
-	int 			 m_Id;
+	int 			 m_Id; // Sequencial na tabela para identificar interrelacionamento de dados
 
 };
 

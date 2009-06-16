@@ -8,6 +8,7 @@ ColumnCursorType::ColumnCursorType(int id) {
 	name = NULL;
 	type = UNKNOWN;
 	blockId = 0;
+	ridNumber = 0;
 	
 	DBUG_LEAVE;
 }

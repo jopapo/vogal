@@ -26,15 +26,17 @@ public:
 	NodeType * parseRecord(CursorType * cursor, ColumnCursorType * column, BlockCursorType * block, GenericPointer * offset);
 	int comparison(SearchInfoType * info, CursorType * cursor, RidCursorType * rid2find, DataCursorType * data2find, int startingOffset = 0);
 	SearchInfoType * findNearest(CursorType * cursor, RidCursorType * rid2find, DataCursorType * data2find, BlockOffset rootBlock);
-	int updateBlockBuffer(CursorType * cursor, BlockCursorType * block, int removed = 0);
-	int updateLocation(CursorType * cursor, NodeType * node);
-	
+	int updateBlockBuffer(CursorType * cursor, BlockCursorType * block, int removed = 0, SearchInfoType * info = NULL);
+	int updateBlockOffset(CursorType * cursor, NodeType * node);
+	int blockSplit(CursorType * cursor, BlockCursorType * block, SearchInfoType * info, int validValues);
+	BigNumber neededSpace(BlockCursorType * block);
+
 	BigNumber insertData(CursorType* cursor, ValueListRoot* dataList, BigNumber ridId = 0);
 	int writeData(CursorType * cursor, RidCursorType * rid, DataCursorType * data);
 	int writeRid(CursorType * cursor, RidCursorType * rid);
 	int writeDataCursor(GenericPointer* dest, DataCursorType * data);
 	int removeFetch(FilterCursorType * filter);
-
+	
 	ValueListRoot * createObjectData(CursorType * cursor, char* name, char* type, BlockOffset* location);
 	ValueListRoot * createColumnData(CursorType * cursor, BigNumber* tableRid, char* name, char* type, BlockOffset* location);
 
