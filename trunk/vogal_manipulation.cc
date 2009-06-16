@@ -645,7 +645,7 @@ int vogal_manipulation::updateBlockBuffer(CursorType * cursor, BlockCursorType *
 				}
 			} else {
 				// Escreve o dado chave da coluna
-				if (!writeDataCursor(&p, node->data)) {
+				if (!m_Handler->getStorage()->writeData(&p, node->data->content, node->data->usedSize, node->data->column->type)) {
 					ERROR("Erro ao escrever o dado chave no buffer da coluna!");
 					goto freeUpdateBlockBuffer;
 				}
@@ -685,15 +685,6 @@ int vogal_manipulation::updateBlockBuffer(CursorType * cursor, BlockCursorType *
 	
 freeUpdateBlockBuffer:
 	DBUG_RETURN(ret);
-}
-
-int vogal_manipulation::writeDataCursor(GenericPointer* dest, DataCursorType * data) {
-	DBUG_ENTER("vogal_manipulation::writeDataCursor");
-	if (!data) {
-		ERROR("Impossível gravar 'nada'!");
-		DBUG_RETURN(false);
-	}
-	DBUG_RETURN( m_Handler->getStorage()->writeAnyData(dest, (GenericPointer)data->content, data->column->type) );
 }
 
 int vogal_manipulation::updateLocation(CursorType * cursor, NodeType * node) {

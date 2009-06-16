@@ -314,9 +314,9 @@ int ha_vogal::write_row(uchar *buf) {
 			case VARCHAR:
 				data->contentOwner = false;
 				data->usedSize = (*field)->data_length();
-				data->allocSize = 1024;
-				buffer = new char[data->allocSize];
-				str_aux = String(buffer, data->allocSize, NULL);
+				data->allocSize = data->usedSize;
+				buffer = new char[data->usedSize];
+				str_aux = String(buffer, data->usedSize, NULL);
 				(*field)->val_str(&str_aux);
 				data->content = (GenericPointer) str_aux.ptr();
 				break;

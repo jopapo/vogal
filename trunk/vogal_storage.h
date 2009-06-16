@@ -25,8 +25,6 @@ public:
 	int writeData(GenericPointer* dest, GenericPointer src, BigNumber dataBytes, DataTypes dataType);
 	int writeDataSize(GenericPointer* dest, BigNumber size);
 	int writeBlock(BlockCursorType* block);
-	int writeAnyData(GenericPointer* dest, GenericPointer src, DataTypes dataType);
-	int writeString(char * strValue, GenericPointer* where);
 	
 	int readSizedNumber(GenericPointer* src, BigNumber* number);
 	int readDataSize(GenericPointer* src, BigNumber* dest);
@@ -38,12 +36,6 @@ public:
 	int skipDataSize(GenericPointer* src);
 
 	bool isOpen();
-
-	/*int writeBlockPointer(BlockOffset where, BlockOffset offset, GenericPointer* buf);
-	int writeInt(int value, GenericPointer* dest);
-	int writeIt(GenericPointer buf);
-	int writeOnEmptyBlock(GenericPointer buf, BlockOffset* block);
-	*/
 	
 private:
 	vogal_handler *m_Handler;
