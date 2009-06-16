@@ -336,7 +336,7 @@ int ha_vogal::write_row(uchar *buf) {
 		vlAdd(dataList, data);
 	}
 
-	rid = vogal->getManipulation()->insertData(share->cursor, dataList);
+	rid = vogal->getManipulation()->insertData(share->cursor, dataList, m_UpdatedRid);
 	if (!rid) {
 		ERROR("Erro ao inserir estrutura de dados da tabela nova");
 		goto error;
@@ -355,13 +355,17 @@ int ha_vogal::update_row(const uchar *old_data, uchar *new_data)
 	DBUG_ENTER("ha_vogal::update_row");
 
 	// Deleta o registro
+	m_UpdatedRid = share->filter->fetch->id;
 	int error = delete_row(old_data);
 	if (error)
-		DBUG_RETURN(error);
+		goto error;
 
 	//Reinsere
-	DBUG_RETURN(write_row(new_data));
+	error = write_row(new_data);
 
+error:
+	m_UpdatedRid = 0;
+	DBUG_RETURN(error);
 }
 
 int ha_vogal::delete_row(const uchar *buf)

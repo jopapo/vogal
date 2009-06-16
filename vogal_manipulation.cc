@@ -142,7 +142,7 @@ BigNumber vogal_manipulation::nextRid(CursorType * cursor) {
 	DBUG_RETURN(id + 1);
 }
 
-BigNumber vogal_manipulation::insertData(CursorType* cursor, ValueListRoot* dataList) {
+BigNumber vogal_manipulation::insertData(CursorType* cursor, ValueListRoot* dataList, BigNumber ridId) {
 	DBUG_ENTER("vogal_manipulation::insertData");
 
 	RidCursorType * newRid = NULL;
@@ -159,7 +159,9 @@ BigNumber vogal_manipulation::insertData(CursorType* cursor, ValueListRoot* data
 
 	// Cria registro RID
 	newRid = new RidCursorType();
-	newRid->id = nextRid(cursor);
+	newRid->id = ridId;
+	if (!newRid->id)
+		newRid->id = nextRid(cursor);
 	newRid->dataList = vlNew(true);
 
 	// Reorganiza lista de dados para bater com a lista de colunas
