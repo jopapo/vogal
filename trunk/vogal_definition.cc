@@ -379,6 +379,7 @@ ObjectCursorType * vogal_definition::openTable(char * tableName) {
 			column->name = cols[i+C_OBJECTS_COLS_COUNT];
 			column->type = vogal_utils::str2type(types[i+C_OBJECTS_COLS_COUNT]);
 			column->blockId = 2 + i + C_OBJECTS_COLS_COUNT;
+			column->ridNumber = 1 + i + C_OBJECTS_COLS_COUNT;
 			if (!vlAdd(table->colsList, column))
 				goto freeOpenTable;
 		}
@@ -400,6 +401,7 @@ ObjectCursorType * vogal_definition::openTable(char * tableName) {
 			column->name = cols[i];
 			column->type = vogal_utils::str2type(types[i]);
 			column->blockId = 2 + i;
+			column->ridNumber = 1 + i;
 			if (!vlAdd(table->colsList, column))
 				goto freeOpenTable;
 		}
@@ -549,7 +551,8 @@ int vogal_definition::newTable(char* name, PairListRoot * columns){
 
 	CursorType * cursor = createTableStructure(name, columns);
 	bool tableCreated = cursor;
-	cursor->~CursorType();
+	if (tableCreated)
+		cursor->~CursorType();
 	
 	DBUG_RETURN(tableCreated); 
 }
@@ -811,18 +814,17 @@ int vogal_definition::parseBlock(CursorType * cursor, ColumnCursorType * column,
 			vlAdd(block->nodesList, node);
 			node = NULL;
 		}
-
-		// Se a quantidade for maior que zero
-		// Depois do último nó sempre tem o nó a direita
-		neighbor = new BlockOffset();
-		if (!m_Handler->getStorage()->readSizedNumber(&p, neighbor)) {
-			ERROR("Erro ao ler nó a direita da árvore de registros");
-			free(neighbor);
-			goto freeParseBlock;
-		}
-		// Adiciona informação à lista
-		vlAdd(block->offsetsList, neighbor);
 	}
+	// Se a quantidade for maior que zero
+	// Depois do último nó sempre tem o nó a direita
+	neighbor = new BlockOffset();
+	if (!m_Handler->getStorage()->readSizedNumber(&p, neighbor)) {
+		ERROR("Erro ao ler nó a direita da árvore de registros");
+		free(neighbor);
+		goto freeParseBlock;
+	}
+	// Adiciona informação à lista
+	vlAdd(block->offsetsList, neighbor);
 
 	ret = true;
 		

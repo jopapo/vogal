@@ -12,7 +12,6 @@ public:
 	virtual ~CursorType();
 
 	ObjectCursorType *table;
-	BigNumber		  lastRid;
 	
 };
 
