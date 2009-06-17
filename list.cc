@@ -8,7 +8,6 @@
 
 #include "list.h"
 #include <my_global.h>
-#include "vogal_utils.h"
 
 // ### RANGE LIST IMPLEMENATION ###
 
@@ -342,7 +341,7 @@ int vlInsert(ValueListRoot* root, ListValueType value, int index) {
 	if (!root)
 		DBUG_RETURN(false);
 	if (index < 0 || index > root->count) {
-		ERROR("Index inválido!");
+		DBUG_PRINT("WARN", ("Index inválido!"));
 		DBUG_RETURN(false);
 	}
 	if (!vlGrow(root))
@@ -359,7 +358,7 @@ int vlRemove(ValueListRoot* root, int index, bool defaultOwnership) {
 	if (!root)
 		DBUG_RETURN(false);
 	if (index < 0 || index >= root->count) {
-		ERROR("Index inválido!");
+		DBUG_PRINT("WARN", ("Index inválido!"));
 		DBUG_RETURN(false);
 	}
 	// Grava ponteiro do nó
@@ -386,7 +385,7 @@ ListValueType * vlGet(ValueListRoot* root, int index) {
 	DBUG_ENTER("vlGet");
 	if ((index < 0) ||
 	    (index >= root->count)) {
-		ERROR("Fora dos limites da lista!"); 
+		DBUG_PRINT("WARN", ("Fora dos limites da lista!"));
 		DBUG_RETURN(NULL);
 	}
 	DBUG_RETURN( (ListValueType *) root->root[index] );
@@ -526,7 +525,7 @@ int stPut(StringTreeRoot* root, TreeNodeName name, TreeNodeValue value) {
 		(*node)->value = value;
 	} else {
 		if ((*node)) {
-			ERROR("Erro ao inserir na ramificação da árvore. Varredura incompleta!");
+			DBUG_PRINT("WARN", ("Erro ao inserir na ramificação da árvore. Varredura incompleta!"));
 			DBUG_RETURN(false);
 		}
 		(*node) = (StringTreeNode*) malloc(sizeof(StringTreeNode));

@@ -15,7 +15,6 @@ public:
 	ValueListRoot   *blocksList; // <BlockCursorType>
 	BlockCursorType *findedBlock;
 	NodeType        *findedNode;
-	//int				 offset;
 	int				 comparison;
 	
 };

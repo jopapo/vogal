@@ -368,6 +368,7 @@ ObjectCursorType * vogal_definition::openTable(char * tableName) {
 		char * cols[] = C_COLUMNS_NAMES;
 		char * types[] = C_COLUMNS_TYPES;
 		table->blockId = C_COLUMNS_BLOCK;
+		table->ridNumber = C_COLUMNS_BLOCK; // Tem que ser a ordem de criação no dicionário
 		table->colsList = vlNew(true);
 		if (!table->colsList) {
 			ERROR("Erro ao criar lista de colunas!");
@@ -390,6 +391,7 @@ ObjectCursorType * vogal_definition::openTable(char * tableName) {
 		char * cols[] = C_COLUMNS_NAMES;
 		char * types[] = C_COLUMNS_TYPES;
 		table->blockId = C_OBJECTS_BLOCK;
+		table->ridNumber = C_OBJECTS_BLOCK; // Tem que ser a ordem de criação no dicionário
 		table->colsList = vlNew(true);
 		if (!table->colsList)
 			goto freeOpenTable;
@@ -450,6 +452,7 @@ ObjectCursorType * vogal_definition::openTable(char * tableName) {
 
 	// Achando, abre o bloco da tabela
 	table->blockId = (*(BigNumber*) dataLocation->content);
+	table->ridNumber = objsFilter->fetch->id;
 	
 	// Obtém as colunas da tablea
 	colsFilter = new FilterCursorType();
