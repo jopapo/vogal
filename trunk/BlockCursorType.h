@@ -22,6 +22,7 @@ public:
 	// Disponíveis apenas após o parse
 	ValueListRoot *nodesList; // <NodeType>
 	ValueListRoot *offsetsList; // <BlockOffset>
+	int			   searchOffset;
 	
 };
 
