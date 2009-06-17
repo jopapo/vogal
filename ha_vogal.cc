@@ -570,6 +570,8 @@ int ha_vogal::create(const char *name, TABLE *table_arg,
 {
 	DBUG_ENTER("ha_vogal::create");
 
+	//vogal->ensureSanity(); // Teste!
+
 	PairListRoot * colList = plNew(false, false);
 	for (Field **field= table_arg->s->field; *field; field++) {
 		char * field_type = NULL;

@@ -6,7 +6,6 @@ CursorType::CursorType() {
 	DBUG_ENTER("CursorType::CursorType");
 	
 	table = NULL;
-	lastRid = 0;
 	
 	DBUG_LEAVE;
 }
