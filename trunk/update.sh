@@ -9,9 +9,12 @@ sudo cp ~/mysql-5.1.34/storage/vogal/.libs/* .
 
 cd /usr/local/mysql/var/test/
 rm *
+cd ../osdb/
+rm *
 
 cd ~/mysql-5.1.34/
-./sql/mysqld --gdb --debug   &
+#./sql/mysqld --gdb --debug   &
+./sql/mysqld --gdb &
 
 cd storage/vogal
 

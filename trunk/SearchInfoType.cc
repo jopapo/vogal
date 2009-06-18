@@ -8,7 +8,7 @@ SearchInfoType::SearchInfoType() {
 	blocksList = NULL;
 	findedBlock = NULL;
 	findedNode = NULL;
-	comparison = 0;
+	notFound = false;
 	
 	DBUG_LEAVE;
 }
