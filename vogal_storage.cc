@@ -3,8 +3,8 @@
 
 #define C_FILENAME "data.vdb"
 
-//#define C_MAX_BLOCKS 5000
-#define C_MAX_BLOCKS 100 // PARA FACILITAR TESTES !!!!
+#define C_MAX_BLOCKS 5000
+//#define C_MAX_BLOCKS 100 // PARA FACILITAR TESTES !!!!
 
 #define BI2BO(x) x * C_BLOCK_SIZE
 

@@ -296,7 +296,7 @@ int ha_vogal::write_row(uchar *buf) {
 	String str_aux;
 
 	// Habilita campos para leitura
-	my_bitmap_map *org_bitmap= dbug_tmp_use_all_columns(table, table->read_set);
+	my_bitmap_map *org_bitmap = tmp_use_all_columns(table, table->read_set);
 
 	// Inicia criação dos dados da tabela
 	for (Field ** field = table->field; *field; field++) {
@@ -348,7 +348,7 @@ int ha_vogal::write_row(uchar *buf) {
 error:
 	vlFree(&dataList);
 
-	dbug_tmp_restore_column_map(table->read_set, org_bitmap);
+	tmp_restore_column_map(table->read_set, org_bitmap);
   
 	DBUG_RETURN(error);
 }
@@ -426,7 +426,7 @@ int ha_vogal::vogal2mysql(CursorType * cursor, RidCursorType * rid) {
 	DataCursorType * data;
 	
 	// Habilita campos para escrita
-	my_bitmap_map *org_bitmap= dbug_tmp_use_all_columns(table, table->write_set);
+	my_bitmap_map *org_bitmap = tmp_use_all_columns(table, table->write_set);
 
 	for (Field ** field = table->field; *field; field++) {
 		if (!bitmap_is_set(table->write_set, (*field)->field_index))
@@ -455,7 +455,7 @@ int ha_vogal::vogal2mysql(CursorType * cursor, RidCursorType * rid) {
 		}
 	}
 
-	dbug_tmp_restore_column_map(table->write_set, org_bitmap);
+	tmp_restore_column_map(table->write_set, org_bitmap);
 
 	ret = true;
 
@@ -471,7 +471,7 @@ int ha_vogal::rnd_next(uchar *buf) {
 		goto error;
 	}
 	
-	if (!share->filter->fetch)
+	if (share->filter->notFound)
 		DBUG_RETURN(HA_ERR_END_OF_FILE);
 
 	if (!vogal2mysql(share->filter->cursor, share->filter->fetch)) {
@@ -505,12 +505,11 @@ int ha_vogal::rnd_pos(uchar *buf, uchar *pos) {
 	rid->id = my_get_ptr(pos, ref_length);
 
 	info = vogal->getManipulation()->findNearest(share->filter->cursor, rid, NULL, share->filter->cursor->table->blockId);
-	if (!info || info->comparison) {
+	if (!info || info->notFound) {
 		ERROR("Erro durante a busca do registro na determinada posição!");
 		error = HA_ERR_KEY_NOT_FOUND;
 		goto error;
 	}
-	
 	if (!vogal2mysql(share->filter->cursor, info->findedNode->rid)) {
 		ERROR("Erro ao atualizar a saída para o banco!");
 		error = HA_ERR_INTERNAL_ERROR;

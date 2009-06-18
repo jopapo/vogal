@@ -23,6 +23,8 @@ public:
 	ValueListRoot *nodesList; // <NodeType>
 	ValueListRoot *offsetsList; // <BlockOffset>
 	int			   searchOffset;
+	bool		   navigatedLeft;
+	bool		   navigatedSelf;
 	
 };
 

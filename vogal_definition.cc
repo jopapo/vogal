@@ -436,7 +436,7 @@ ObjectCursorType * vogal_definition::openTable(char * tableName) {
 		ERROR("Erro ao efetuar o fetch da tabela!");
 		goto freeOpenTable;
 	}
-	if (!objsFilter->fetch) {
+	if (objsFilter->notFound) {
 		DBUG_PRINT("INFO", ("Tabela não encontrada!"));
 		goto freeOpenTable;
 	}
@@ -486,7 +486,7 @@ ObjectCursorType * vogal_definition::openTable(char * tableName) {
 			ERROR("Impossível efetuar o fetch das colunas!");
 			goto freeOpenTable;
 		}
-		if (!colsFilter->fetch)
+		if (colsFilter->notFound)
 			break;
 		int check = 0;
 		ColumnCursorType * column = new ColumnCursorType(vlCount(table->colsList));
@@ -687,7 +687,7 @@ int vogal_definition::dropTable(char* name) {
 		ERROR("Erro ao efetuar o fetch do objeto!");
 		goto freeDropTable;
 	}
-	if (!objsFilter->fetch) {
+	if (objsFilter->notFound) {
 		DBUG_PRINT("INFO", ("Tabela não encontrada!"));
 		goto freeDropTable;
 	}
@@ -724,7 +724,7 @@ int vogal_definition::dropTable(char* name) {
 			ERROR("Erro ao efetuar o fetch das colunas!");
 			goto freeDropTable;
 		}
-		if (!colsFilter->fetch)
+		if (colsFilter->notFound)
 			break;
 		if (!m_Handler->getManipulation()->removeFetch(colsFilter)) {
 			ERROR("Erro ao excluir colunas da tabela!");
@@ -790,7 +790,7 @@ int vogal_definition::parseBlock(CursorType * cursor, ColumnCursorType * column,
 		ERROR("Erro ao ler a quantidade de registros no block");
 		goto freeParseBlock;
 	}
-
+	
 	if (dataCount > 0) {
 		for (int i = 0; i < dataCount; i++) {
 			// Auxiliares

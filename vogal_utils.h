@@ -9,8 +9,8 @@
 #define VOGAL "vogal"
 #define VOGAL_EXT ".VDB"
 
-//#define C_BLOCK_SIZE 1024
-#define C_BLOCK_SIZE 384 // Facilitar testes
+#define C_BLOCK_SIZE 1024
+//#define C_BLOCK_SIZE 384 // Facilitar testes
 
 #define C_BLOCK_TYPE_MAIN_TAB 0
 #define C_BLOCK_TYPE_MAIN_COL 1

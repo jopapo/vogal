@@ -9,7 +9,9 @@ BlockCursorType::BlockCursorType() {
 	buffer = NULL;
 	nodesList = NULL;
 	offsetsList = NULL;
-	searchOffset = -1;
+	searchOffset = 0;
+	navigatedLeft = false;
+	navigatedSelf = false;
 	
 	DBUG_LEAVE;
 }
