@@ -14,7 +14,8 @@ rm *
 
 cd ~/mysql-5.1.34/
 #./sql/mysqld --gdb --debug   &
-./sql/mysqld --gdb &
+#./sql/mysqld 2> /tmp/erro-mysql.log &
+./sql/mysqld &
 
 cd storage/vogal
 
