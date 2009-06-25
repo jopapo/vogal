@@ -164,8 +164,6 @@ BigNumber vogal_manipulation::insertData(CursorType* cursor, ValueListRoot* data
 		newRid->id = nextRid(cursor);
 	newRid->dataList = vlNew(true);
 	
-	fprintf(stderr, "New: %llu\n", newRid->id);
-	
 	// Reorganiza lista de dados para bater com a lista de colunas
 	dataList->owner = false;
 	for (int i = 0; i < vlCount(cursor->table->colsList); i++) {
@@ -257,7 +255,7 @@ int vogal_manipulation::removeFetch(FilterCursorType * filter) {
 
 		node = (NodeType *) vlGet(block->nodesList, data->blockOffset);
 		if (!node) {
-			ERROR("Erro ao localizar nodo específico do dado da coluna!");
+			ERROR("Erro ao localizar nodo específico do dado da coluna para exclusão!");
 			goto freeRemoveFetch;
 		}
 		node->deleted = true;
@@ -518,7 +516,6 @@ SearchInfoType * vogal_manipulation::findNearest(CursorType * cursor, RidCursorT
 	info->rootBlock = m_Handler->getStorage()->openBlock(rootBlock);
 	info->blocksList = vlNew(true);
 	info->findedBlock = info->rootBlock;
-
 	if (!comparison(info, cursor, rid2find, data2find)) {
 		ERROR("Erro durante o processo de comparação!");
 		info->~SearchInfoType();
@@ -709,22 +706,18 @@ int vogal_manipulation::blockSplit(CursorType * cursor, SearchInfoType * info, B
 		goto freeBlockSplit;
 	}
 	
-	//if (!updatingColumnBlock) fprintf(stderr, "Divisão - Dividido: %llu, Novo Irmão %llu, Pai: %llu\n", block->id, splitBlockBrother->id, splitBlockParent->id);
-
 	// Adiciona os demais no bloco mano
 	// TODO: Remover offsets desnecessários (Na folha sempre serão zerados!)
 	splitBlockBrother->nodesList = vlNew(true);
 	splitBlockBrother->offsetsList = vlNew(true);
 	brotherDeleted = 0;
+	
 	for (int i = count - 1; i > middle; i--) {
 		nodeAux = (NodeType*) vlGet(block->nodesList, i);
 		if (nodeAux->deleted) {
 			brotherDeleted++;
 			continue;
 		}
-		
-		//if (!updatingColumnBlock) fprintf(stderr, "Nó para o irmão %llu - %llu\n", splitBlockBrother->id, nodeAux->rid->id);
-		
 		// Atualiza deslocamento do nó
 		if (updatingColumnBlock) {
 			nodeAux->data->blockId = splitBlockBrother->id;
@@ -751,12 +744,18 @@ int vogal_manipulation::blockSplit(CursorType * cursor, SearchInfoType * info, B
 
 	// Adiciona nó pai
 	nodeAux = (NodeType*) vlGet(block->nodesList, middle);
+	vlRemove(block->nodesList, middle, false);
 	vlInsert(splitBlockParent->nodesList, nodeAux, splitBlockParent->searchOffset);
 	vlInsert(splitBlockParent->offsetsList, blockIdAux, splitBlockParent->searchOffset + 1);
 
-	//if (!updatingColumnBlock) fprintf(stderr, "Nó para o pai %llu - %llu\n", splitBlockParent->id, nodeAux->rid->id);
-	
-	// Atualiza deslocamento do nó só se for dado
+	// Atualiza buffers (somente para o info para o parent pois o brother NÃO VAI exceder)
+	if (!updateBlockBuffer(cursor, splitBlockParent, parentDeleted, info) || 
+		!updateBlockBuffer(cursor, splitBlockBrother, brotherDeleted)) {
+		ERROR("Erro ao preencher memória do bloco com dados concretos!");
+		goto freeBlockSplit;
+	}
+
+	// Atualiza deslocamento do nó só se for dado e só depois do updateBlockBuffer, pois lá pd haver um novo split
 	if (updatingColumnBlock) {
 		parentDeleted = 0;
 		for (int i = splitBlockParent->searchOffset; i < vlCount(splitBlockParent->nodesList); i++) {
@@ -767,22 +766,15 @@ int vogal_manipulation::blockSplit(CursorType * cursor, SearchInfoType * info, B
 			}
 			nodeAux->data->blockId = splitBlockParent->id;
 			nodeAux->data->blockOffset = i - parentDeleted;
-
-			if (!nodeAux->inserted)
+			if (!nodeAux->inserted) {
 				if (!updateBlockOffset(cursor, nodeAux)) {
 					ERROR("Erro ao atualizar restante do deslocamento do nó pai!");
 					goto freeBlockSplit;
 				}
+			}
 		}
 	}
-
-	// Atualiza buffers (somente para o info para o parent pois o brother NÃO PODE exceder)
-	if (!updateBlockBuffer(cursor, splitBlockParent, parentDeleted, info) || 
-		!updateBlockBuffer(cursor, splitBlockBrother, brotherDeleted)) {
-		ERROR("Erro ao preencher memória do bloco com dados concretos!");
-		goto freeBlockSplit;
-	}
-
+	
 	// Se estava na lista, recoloca para não dar problema no restante da gravação
 	if (parentIsUp)
 		vlAdd(info->blocksList, splitBlockParent);
@@ -979,7 +971,7 @@ int vogal_manipulation::updateBlockOffset(CursorType * cursor, NodeType * node) 
 	// Declarações
 	int ret = false;
 	SearchInfoType * info;
-
+	
 	// Se não achou em memória, faz a busca na base
 	info = findNearest(cursor, node->rid, NULL, cursor->table->blockId);
 	if (info && !info->notFound) {
@@ -992,7 +984,7 @@ int vogal_manipulation::updateBlockOffset(CursorType * cursor, NodeType * node) 
 		
 		data->blockId = node->data->blockId;
 		data->blockOffset = node->data->blockOffset;
-
+		
 		// TODO: CUIDADO!!! Nunca encher muito o bloco pois na atualização do deslocamento normalmente se ocupam mais ou menos blocos na
 		//		hora de escrevê-lo. Portanto, nunca encher o bloco por completo
 		if (!updateBlockBuffer(cursor, info->findedBlock)) {
@@ -1125,12 +1117,12 @@ int vogal_manipulation::fillDataFromLocation(CursorType * cursor, DataCursorType
 		ERROR("Erro ao abrir bloco para carregar dado da coluna!");
 		goto freeFillDataFromLocation;
 	}
-
+	
 	if (!m_Handler->getDefinition()->parseBlock(cursor, data->column, block)) {
 		ERROR("Erro ao efetuar o parse ao carregar dado da coluna!");
 		goto freeFillDataFromLocation;
 	}
-
+	
 	node = (NodeType *) vlGet(block->nodesList, data->blockOffset);
 	if (!node) {
 		ERROR("Erro ao localizar nodo específico do dado da coluna!");
@@ -1227,13 +1219,17 @@ int vogal_manipulation::fetch(FilterCursorType * filter){
 		ERROR("Erro ao identificar RID localizado!");
 		goto freeFetch;
 	}
+	
 	// Por enquanto obtém todas as colunas
 	// TODO: Pegar somente as colunas solicitadas
-	for (int d = 0; d < vlCount(filter->fetch->dataList); d++)
-		if (!fillDataFromLocation(filter->cursor, (DataCursorType*) vlGet(filter->fetch->dataList, d))) {
+	for (int d = 0; d < vlCount(filter->fetch->dataList); d++) {
+		DataCursorType* data = (DataCursorType*) vlGet(filter->fetch->dataList, d);
+		if (!fillDataFromLocation(filter->cursor, data)) {
 			ERROR("Erro ao preencher as colunas com os dados de seus deslocamentos");
 			goto freeFetch;
 		}
+	}
+	
 	filter->count ++;
 	ret = true;
 freeFetch:
