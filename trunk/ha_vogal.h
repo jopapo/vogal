@@ -73,7 +73,7 @@ public:
   int vogal2mysql(CursorType * cursor, RidCursorType * rid);
 
 private:
-	BigNumber m_UpdatedRid; // Auxiliar para criar registro com mesmo RID
+	//BigNumber m_UpdatedRid; // Auxiliar para criar registro com mesmo RID
   
 };
 
