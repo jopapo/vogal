@@ -26,11 +26,9 @@ public:
 	NodeType * parseRecord(CursorType * cursor, ColumnCursorType * column, BlockCursorType * block, GenericPointer * offset);
 	int comparison(SearchInfoType * info, CursorType * cursor, RidCursorType * rid2find, DataCursorType * data2find);
 	SearchInfoType * findNearest(CursorType * cursor, RidCursorType * rid2find, DataCursorType * data2find, BlockOffset rootBlock);
-	int updateBlockBuffer(CursorType * cursor, BlockCursorType * block, int removed = 0, SearchInfoType * info = NULL);
+	int updateBlockBuffer(CursorType * cursor, BlockCursorType * block, SearchInfoType * info = NULL);
 	int updateBlockOffset(CursorType * cursor, NodeType * node);
-	int blockSplit(CursorType * cursor, SearchInfoType * info, BlockCursorType * block, int validValues);
-	BigNumber neededSpace(BlockCursorType * block);
-
+	
 	BigNumber insertData(CursorType* cursor, ValueListRoot* dataList, BigNumber ridId = 0);
 	int writeData(CursorType * cursor, RidCursorType * rid, DataCursorType * data);
 	int writeRid(CursorType * cursor, RidCursorType * rid);
@@ -42,6 +40,13 @@ public:
 
 private:
 	vogal_handler *m_Handler;
+
+	BigNumber estimateHeaderSpace();
+	BigNumber estimateBlockSpace(BlockCursorType * block);
+	BigNumber estimateNodeSpace(BlockCursorType * block, NodeType * node);
+
+	//int blockMerge(CursorType * cursor, SearchInfoType * info, BlockCursorType ** block);
+	int blockSplit(CursorType * cursor, SearchInfoType * info, BlockCursorType * block, int validValues);
 
 };
 

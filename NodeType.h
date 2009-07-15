@@ -4,6 +4,7 @@
 
 #include "RidCursorType.h"
 #include "DataCursorType.h"
+#include "BlockCursorType.h"
 
 class NodeType {
 
@@ -13,7 +14,7 @@ public:
 
 	RidCursorType  *rid;
 	DataCursorType *data;
-	bool 			dataOwner;
+	bool 		 	dataOwner;
 	bool			deleted;
 	bool 			inserted;
 	

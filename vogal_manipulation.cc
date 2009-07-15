@@ -1,6 +1,9 @@
 
 #include "vogal_manipulation.h"
 
+#define SIZE_AVG_COUNT 2
+#define SIZE_AVG_BLOCK 6
+	
 vogal_manipulation::vogal_manipulation(vogal_handler *handler){
 	DBUG_ENTER("vogal_manipulation::vogal_manipulation");
 	
@@ -219,11 +222,11 @@ int vogal_manipulation::removeFetch(FilterCursorType * filter) {
 	filter->infoFetch->findedNode->deleted = true;
 
 	// Troca o dono da lista de dados
-	dataList = filter->fetch->dataList;
-	filter->fetch->dataList = NULL;
+	//dataList = filter->fetch->dataList;
+	//filter->fetch->dataList = NULL;
 
 	// Atualiza e grava
-	if (!updateBlockBuffer(filter->cursor, filter->infoFetch->findedBlock, 1)) {
+	if (!updateBlockBuffer(filter->cursor, filter->infoFetch->findedBlock)) {
 		ERROR("Erro ao atualizar o buffer do bloco dos rids!");
 		goto freeRemoveFetch;
 	}
@@ -235,6 +238,7 @@ int vogal_manipulation::removeFetch(FilterCursorType * filter) {
 
 	ret = true;
 
+	/* ### Não precisa por causa da lápide ###
 	// Atualiza dados
 	for (int i = 0; i < vlCount(dataList); i++) {
 		data = (DataCursorType *) vlGet(dataList, i);
@@ -261,7 +265,7 @@ int vogal_manipulation::removeFetch(FilterCursorType * filter) {
 		node->deleted = true;
 
 		// Atualiza e grava
-		if (!updateBlockBuffer(filter->cursor, block, 1)) {
+		if (!updateBlockBuffer(filter->cursor, block)) {
 			ERROR("Erro ao atualizar o buffer do bloco!");
 			goto freeRemoveFetch;
 		}
@@ -271,7 +275,7 @@ int vogal_manipulation::removeFetch(FilterCursorType * filter) {
 			goto freeRemoveFetch;
 		}
 		
-	}
+	} */
 
 freeRemoveFetch:
 	if (block)
@@ -317,6 +321,11 @@ NodeType * vogal_manipulation::parseRecord(CursorType * cursor, ColumnCursorType
 	node->rid->dataList = vlNew(true);
 		
 	if (block->header->type == C_BLOCK_TYPE_MAIN_TAB) {
+		// Lê a lápide (1 byte é mto grande. Corrigir)
+		node->deleted = (*(*offset));
+		(*offset)++;
+
+		// Lê o RID
 		if (!m_Handler->getStorage()->readSizedNumber(offset, &node->rid->id)) {
 			ERROR("Erro ao ler o rid do registro!");
 			goto freeParseRecord;
@@ -438,7 +447,7 @@ continueWhileComparison:
 		}
 	for (; info->findedBlock->searchOffset < vlCount(info->findedBlock->offsetsList); info->findedBlock->searchOffset++, info->findedBlock->navigatedSelf = false, info->findedBlock->navigatedLeft = false) {
 		int comparison = -1;
-		bool comparable = info->findedBlock->searchOffset < vlCount(info->findedBlock->nodesList);
+		bool comparable = (info->findedBlock->searchOffset < vlCount(info->findedBlock->nodesList));
 		if (comparable) {
 			info->findedNode = (NodeType *) vlGet(info->findedBlock->nodesList, info->findedBlock->searchOffset);
 			if (needsComparison) {
@@ -483,8 +492,9 @@ continueWhileComparison:
 					goto continueWhileComparison;
 				}
 			}
-			if (comparable && (!needsComparison || !comparison))
+			if (comparable && (!needsComparison || !comparison)) {
 				goto okComparison;
+			}
 			break;
 		}
 	}
@@ -525,6 +535,105 @@ SearchInfoType * vogal_manipulation::findNearest(CursorType * cursor, RidCursorT
 	DBUG_RETURN(info);
 }
 
+/*int vogal_manipulation::blockMerge(CursorType * cursor, SearchInfoType * info, BlockCursorType ** block) {
+	DBUG_ENTER("vogal_manipulation::blockMerge");
+	
+	int ret = false;
+	BlockCursorType * leftBlock = NULL;
+	BlockCursorType * rightBlock = NULL;
+	
+	// Se não houver informação disponível da fila de blocos, não permite informações maiores que um bloco
+	if (!info || !block || !(*block) || !cursor) {
+		ERROR("Impossível excluir informação que exceda o limite mínimo de um bloco sem que seja informado sua paternidade!");
+		goto freeBlockMerge;
+	}
+
+	// Se for o bloco raiz, apenas sai para efetuar a gravação na chamadora, senão...
+	if ((*block) != info->rootBlock) {
+		BlockOffset * leftLeaf;
+
+		// Verifica se o nó é folha ou interno. É possível distinguir verificando se tem filhos
+		leftLeaf = (BlockOffset *) vlGet(block->offsetsList, block->searchOffset);
+		if (!leftLeaf) {
+			ERROR("Impossível obter nó a esquerda do nó excluído!");
+			goto freeBlockMerge;
+		}
+		
+		// Se não for folha, então é interno e então exige reorganização pois é separador
+		if ((*leftLeaf)) {
+			BlockOffset * rightLeaf;
+			BigNumber leftSize;
+			BigNumber rightSize;
+
+			// Obtém endereço do nó da direita
+			rightLeaf = (BlockOffset *) vlGet(block->offsetsList, block->searchOffset + 1);
+			if (!rightLeaf || !(*rightLeaf)) {
+				ERROR("Impossível obter nó a direita do nó excluído!");
+				goto freeBlockMerge;
+			}
+			
+			// #### NECESSÁRIOS PARA CÁLCULO DO ESPAÇO DISPONÍVEL ###
+			
+			// Abre nó da esquerda
+			leftBlock = m_Handler->getStorage()->openBlock((*leftLeaf));
+			if (!leftBlock) {
+				ERROR("Erro ao obter bloco irmão da esquerda!");
+				goto freeBlockMerge;
+			}
+			
+			// Divide nó da esquerda 
+			if (!m_Handler->getDefinition()->parseBlock(cursor, info->findedNode->data->column, leftBlock)) {
+				ERROR("Erro ao extrair informações do bloco irmão da esquerda!");
+				goto freeBlockMerge;
+			}
+			
+			// Calcula o tamanho do nó da esquerda
+			leftSize = estimateBlockSpace(leftBlock);
+			
+			// Abre o nó da direita
+			rightBlock = m_Handler->getStorage()->openBlock((*rightLeaf));
+			if (!rightBlock) {
+				ERROR("Erro ao obter bloco irmão da direita!");
+				goto freeBlockMerge;
+			}
+			
+			// Divide nó da direita
+			if (!m_Handler->getDefinition()->parseBlock(cursor, info->findedNode->data->column, rightBlock)) {
+				ERROR("Erro ao extrair informações do bloco irmão da direita!");
+				goto freeBlockMerge;
+			}
+			
+			// Calcula o tamanho do nó da direita
+			rightSize = estimateBlockSpace(rightBlock);
+			
+			// Verifica os nós filhos cabem em um só bloco
+			if (leftSize + rightSize < C_BLOCK_SIZE) {
+				// Neste caso move os nós do bloco da esquerda para a direita
+				
+			}
+		
+				
+			
+		}
+		
+		// Balanceamento
+	
+	
+
+ //&& (!spaceNeeded || (C_BLOCK_SIZE / spaceNeeded > 2)
+ 
+ 	ret = true;
+	
+freeBlockMerge:
+	if (leftBlock)
+		leftBlock->~BlockCursorType();
+	if (rightBlock)
+		rightBlock->~BlockCursorType();
+
+	DBUG_RETURN(ret);
+}
+*/
+	
 int vogal_manipulation::blockSplit(CursorType * cursor, SearchInfoType * info, BlockCursorType * block, int validValues) {
 	DBUG_ENTER("vogal_manipulation::blockSplit");
 
@@ -532,8 +641,6 @@ int vogal_manipulation::blockSplit(CursorType * cursor, SearchInfoType * info, B
 	int ret = false;
 	int middle = validValues / 2;
 	int count;
-	int parentDeleted = 0;
-	int brotherDeleted = 0;
 	bool updatingColumnBlock;
 	bool parentIsUp = false;
 	BlockOffset * blockIdAux;
@@ -637,7 +744,7 @@ int vogal_manipulation::blockSplit(CursorType * cursor, SearchInfoType * info, B
 		// Marca como removido
 		locationNode->deleted = true;
 		// Atualiza bloco
-		if (!updateBlockBuffer(parentCursor, locationBlock, 1)) {
+		if (!updateBlockBuffer(parentCursor, locationBlock)) {
 			ERROR("Erro ao preencher memória do bloco pai com dados concretos!");
 			goto freeBlockSplit;
 		}
@@ -682,8 +789,6 @@ int vogal_manipulation::blockSplit(CursorType * cursor, SearchInfoType * info, B
 	nodeAux = NULL;
 	for (; middle < count; middle++) {
 		nodeAux = (NodeType *) vlGet(block->nodesList, middle);
-		if (nodeAux->deleted)
-			continue;
 		break;
 	}
 	if (!nodeAux) {
@@ -710,18 +815,13 @@ int vogal_manipulation::blockSplit(CursorType * cursor, SearchInfoType * info, B
 	// TODO: Remover offsets desnecessários (Na folha sempre serão zerados!)
 	splitBlockBrother->nodesList = vlNew(true);
 	splitBlockBrother->offsetsList = vlNew(true);
-	brotherDeleted = 0;
 	
 	for (int i = count - 1; i > middle; i--) {
 		nodeAux = (NodeType*) vlGet(block->nodesList, i);
-		if (nodeAux->deleted) {
-			brotherDeleted++;
-			continue;
-		}
 		// Atualiza deslocamento do nó
 		if (updatingColumnBlock) {
 			nodeAux->data->blockId = splitBlockBrother->id;
-			nodeAux->data->blockOffset = i - middle - 1 - brotherDeleted;
+			nodeAux->data->blockOffset = i - middle - 1;
 			if (!nodeAux->inserted)
 				if (!updateBlockOffset(cursor, nodeAux)) {
 					ERROR("Erro ao atualizar o deslocamento do nó irmão!");
@@ -749,23 +849,18 @@ int vogal_manipulation::blockSplit(CursorType * cursor, SearchInfoType * info, B
 	vlInsert(splitBlockParent->offsetsList, blockIdAux, splitBlockParent->searchOffset + 1);
 
 	// Atualiza buffers (somente para o info para o parent pois o brother NÃO VAI exceder)
-	if (!updateBlockBuffer(cursor, splitBlockParent, parentDeleted, info) || 
-		!updateBlockBuffer(cursor, splitBlockBrother, brotherDeleted)) {
+	if (!updateBlockBuffer(cursor, splitBlockParent, info) || 
+		!updateBlockBuffer(cursor, splitBlockBrother)) {
 		ERROR("Erro ao preencher memória do bloco com dados concretos!");
 		goto freeBlockSplit;
 	}
 
 	// Atualiza deslocamento do nó só se for dado e só depois do updateBlockBuffer, pois lá pd haver um novo split
 	if (updatingColumnBlock) {
-		parentDeleted = 0;
 		for (int i = splitBlockParent->searchOffset; i < vlCount(splitBlockParent->nodesList); i++) {
 			nodeAux = (NodeType*) vlGet(splitBlockParent->nodesList, i);
-			if (nodeAux->deleted) {
-				parentDeleted++;
-				continue;
-			}
 			nodeAux->data->blockId = splitBlockParent->id;
-			nodeAux->data->blockOffset = i - parentDeleted;
+			nodeAux->data->blockOffset = i;
 			if (!nodeAux->inserted) {
 				if (!updateBlockOffset(cursor, nodeAux)) {
 					ERROR("Erro ao atualizar restante do deslocamento do nó pai!");
@@ -803,40 +898,53 @@ freeBlockSplit:
 	DBUG_RETURN(ret);
 }
 
-BigNumber vogal_manipulation::neededSpace(BlockCursorType * block) {
-	DBUG_ENTER("vogal_manipulation::neededSpace");
+BigNumber vogal_manipulation::estimateHeaderSpace() {
+	DBUG_ENTER("vogal_manipulation::estimateHeaderSpace");
+	DBUG_RETURN (sizeof(BlockHeaderType) + // Cabeçalho
+		SIZE_AVG_COUNT); // Tamanho necessário para representar a qtd registros
+}
 
-	#define SIZE_AVG_COUNT 2
-	#define SIZE_AVG_BLOCK 6
-	
+BigNumber vogal_manipulation::estimateNodeSpace(BlockCursorType * block, NodeType * node) {
+	DBUG_ENTER("vogal_manipulation::estimateNodeSpace");
+	BigNumber space;
+	if (block->header->type == C_BLOCK_TYPE_MAIN_TAB) {
+		space += 1 + // Lápide
+			SIZE_AVG_BLOCK + // Rid
+			vlCount(node->rid->dataList) * ( 6 + SIZE_AVG_COUNT ); // Blocos (6) + Deslocamentos (2)
+	} else {
+		space += node->data->usedSize + // Dado da chave
+			SIZE_AVG_BLOCK; // Rid
+	}
+	DBUG_RETURN(space);
+}
+
+BigNumber vogal_manipulation::estimateBlockSpace(BlockCursorType * block) {
+	DBUG_ENTER("vogal_manipulation::estimateBlockSpace");
+
 	BigNumber count = vlCount(block->nodesList);
-	BigNumber removed = 0;
-	BigNumber space = sizeof(BlockHeaderType) + // Cabeçalho
-		SIZE_AVG_COUNT; // Tamanho necessário para representar a qtd registros
+	//BigNumber removed = 0;
+	BigNumber space = estimateHeaderSpace();
 	for (int i = 0; i < count; i++) {
 		NodeType * node = (NodeType *) vlGet(block->nodesList, i);
-		if (node->deleted) {
+		/*if (node->deletedFromBlock == block) {
 			removed++;
 			continue;
-		}
-		if (block->header->type == C_BLOCK_TYPE_MAIN_TAB) {
-			space += SIZE_AVG_BLOCK + // Rid
-				vlCount(node->rid->dataList) * ( 6 + SIZE_AVG_COUNT ); // Blocos (6) + Deslocamentos (2)
-		} else {
-			space += node->data->usedSize + // Dado da chave
-				SIZE_AVG_BLOCK; // Rid
-		}
+		}*/
+		space += estimateNodeSpace(block, node);
 	}
 	space +=
-		SIZE_AVG_BLOCK * (count - removed); // Quantidade de ponteiros à esquerda dos nodos
-	if (count - removed) // Se houver dados, um ponteiro à direita
+		SIZE_AVG_BLOCK * count; // Quantidade de ponteiros à esquerda dos nodos
+		//SIZE_AVG_BLOCK * (count - removed); // Quantidade de ponteiros à esquerda dos nodos
+	if (count) // Se houver dados, um ponteiro à direita
+	//if (count - removed) // Se houver dados, um ponteiro à direita
 		space += SIZE_AVG_BLOCK;
 
 	DBUG_RETURN(space);
 }
 
 // TODO: Estudar o que fazer no caso de nós solitários, ou seja, que só cabe 1 por bloco (Tvz permitir dividí-los)
-int vogal_manipulation::updateBlockBuffer(CursorType * cursor, BlockCursorType * block, int removed, SearchInfoType * info) {
+//int vogal_manipulation::updateBlockBuffer(CursorType * cursor, BlockCursorType * block, int removed, SearchInfoType * info) {
+int vogal_manipulation::updateBlockBuffer(CursorType * cursor, BlockCursorType * block, SearchInfoType * info) {
 	DBUG_ENTER("vogal_manipulation::updateBlockBuffer");
 
 	int ret = false;
@@ -844,7 +952,7 @@ int vogal_manipulation::updateBlockBuffer(CursorType * cursor, BlockCursorType *
 	GenericPointer p;
 	BlockOffset * neighbor;
 	NodeType * node;
-	int validValues;
+	//int validValues;
 
 	if (!block) {
 		ERROR("Bloco inválido para atualização!");
@@ -853,47 +961,54 @@ int vogal_manipulation::updateBlockBuffer(CursorType * cursor, BlockCursorType *
 	
 	if (block->nodesList)
 		count = vlCount(block->nodesList);
-
+	
+	// Se houver exclusão deve verificar a necessidade de merge dos blocos
+	/*if (removed) {
+		if (!blockMerge(cursor, info, &block)) {
+			ERROR("Impossível efetuar a divisão do bloco!");
+			goto freeUpdateBlockBuffer;
+		}
+		// Sai pois o bloco não existe mais
+		if (!block) {
+			ret = true;
+			goto freeUpdateBlockBuffer;		
+		}
+	}*/
+				
 	// Estimar tamanho necessário.
 	// TODO: Melhorar a estimativa de campos numéricos - Está pegando sempre máximo em relação ao tamanho da base de dados
-	validValues = count - removed;
-
-	// Se não há mais dados no bloco, estudar possibilidade de eliminá-lo
-	if (!validValues) {
-		// Se houver informações, verifica se o bloco não é raiz e mescla ele com seu irmão
-		if (info) {
-			// Por enquanto grava o bloco vazio.
-		}
-	}
+	//validValues = count - removed;
+	
 	// Se o espaço necessário for maior que o disponível no bloco, deve separá-lo (split)
 	// TODO: Testar formações de campos que sejam muito grandes, ou seja, maior que o bloco de 1024 bytes
-	else if (neededSpace(block) > C_BLOCK_SIZE) {
-		if (!blockSplit(cursor, info, block, validValues)) {
+	if (estimateBlockSpace(block) > C_BLOCK_SIZE) {
+		//if (!blockSplit(cursor, info, block, validValues)) {
+		if (!blockSplit(cursor, info, block, count)) {
 			ERROR("Impossível efetuar a divisão do bloco!");
 			goto freeUpdateBlockBuffer;
 		}
 		// Recalcula pois foi dividido
 		count = vlCount(block->nodesList);
-		validValues = count - removed;
+		//validValues = count - removed;
 	}
 
-		
 	p = block->buffer + sizeof(BlockHeaderType);
-	if (!m_Handler->getStorage()->writeDataSize(&p, count - removed)) {
+	if (!m_Handler->getStorage()->writeDataSize(&p, count)) {
+	//if (!m_Handler->getStorage()->writeDataSize(&p, count - removed)) {
 		ERROR("Erro ao escrever a quantidade de dados do bloco!");
 		goto freeUpdateBlockBuffer;
 	}
 
 	if (count > 0) {
 		int writed = 0;
-		int deleted = 0;
+		//int deleted = 0;
 		int added = 0;
 		for (int i = 0; i < count; i++) {
 			node = (NodeType *) vlGet(block->nodesList, i);
-			if (node->deleted) {
+			/*if (node->deletedFromBlock == block) {
 				deleted++;
 				continue;
-			}
+			}*/
 			if (node->inserted) {
 				added++;
 			}
@@ -903,6 +1018,9 @@ int vogal_manipulation::updateBlockBuffer(CursorType * cursor, BlockCursorType *
 				goto freeUpdateBlockBuffer;
 			}
 			if (block->header->type == C_BLOCK_TYPE_MAIN_TAB) {
+				// Grava a lápide apenas no RID (1B é demais...)
+				(*p) = node->deleted;
+				p++;
 				// Escreve o número do RID
 				if (!m_Handler->getStorage()->writeNumber(node->rid->id, &p)) {
 					ERROR("Erro ao escrever o rid no buffer da tabela!");
@@ -935,9 +1053,11 @@ int vogal_manipulation::updateBlockBuffer(CursorType * cursor, BlockCursorType *
 				}
 				// Atualiza a informação de localização
 				node->data->blockId = block->id;
-				node->data->blockOffset = i - deleted;
+				node->data->blockOffset = i;
+				//node->data->blockOffset = i - deleted;
 				// Se excluiu algum antes, atualiza pais
-				if (!node->inserted && (deleted || added)) {
+				if (!node->inserted && added) {
+				//if (!node->inserted && (deleted || added)) {
 					// TODO: Otimizar para fazer todas as operações em memória e gravar em disco apenas uma vez
 					if (!updateBlockOffset(cursor, node)) {
 						ERROR("Erro ao atualizar o deslocamento das colunas do bloco!");
@@ -1046,7 +1166,7 @@ int vogal_manipulation::writeData(CursorType * cursor, RidCursorType * rid, Data
 		vlInsert(info->findedBlock->offsetsList, neighbor, info->findedBlock->searchOffset + 1);
 	}
 
-	if (!updateBlockBuffer(cursor, info->findedBlock, 0, info)) {
+	if (!updateBlockBuffer(cursor, info->findedBlock, info)) {
 		ERROR("Erro ao atualizar o buffer do bloco!");
 		goto freeWriteData;
 	}
@@ -1159,6 +1279,7 @@ int vogal_manipulation::fetch(FilterCursorType * filter){
 	if (filter->notFound)
 		goto fetchEmpty;
 
+doNext:
 	if (filter->data) {
 		if (!filter->opened) {
 			// Obtém o rid do dado a ser localizado
@@ -1220,6 +1341,10 @@ int vogal_manipulation::fetch(FilterCursorType * filter){
 		goto freeFetch;
 	}
 	
+	if (filter->infoFetch->findedNode->deleted) { // Excluído não vale
+		goto doNext;
+	}
+
 	// Por enquanto obtém todas as colunas
 	// TODO: Pegar somente as colunas solicitadas
 	for (int d = 0; d < vlCount(filter->fetch->dataList); d++) {

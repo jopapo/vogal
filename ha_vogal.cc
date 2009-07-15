@@ -140,7 +140,8 @@ static handler* vogal_create_handler(handlerton *hton,
 
 ha_vogal::ha_vogal(handlerton *hton, TABLE_SHARE *table_arg) : handler(hton, table_arg) {
 	DBUG_ENTER("ha_vogal::ha_vogal");
-	DBUG_LEAVE;
+	ref_length = sizeof(BigNumber);
+   	DBUG_LEAVE;
 }
 
 ha_vogal::~ha_vogal() {
@@ -201,6 +202,7 @@ ulong ha_vogal::index_flags(uint inx, uint part, bool all_parts) const {
 
 /*
 const char *ha_vogal::index_type(uint inx) {
+	* 
 	DBUG_ENTER("ha_vogal::index_type");
 	DBUG_RETURN("HASH");
 }
@@ -338,7 +340,8 @@ int ha_vogal::write_row(uchar *buf) {
 		vlAdd(dataList, data);
 	}
 
-	rid = vogal->getManipulation()->insertData(share->cursor, dataList, m_UpdatedRid);
+	rid = vogal->getManipulation()->insertData(share->cursor, dataList);
+	//rid = vogal->getManipulation()->insertData(share->cursor, dataList, m_UpdatedRid);
 	if (!rid) {
 		ERROR("Erro ao inserir estrutura de dados da tabela nova");
 		error = HA_ERR_INTERNAL_ERROR;
@@ -358,7 +361,7 @@ int ha_vogal::update_row(const uchar *old_data, uchar *new_data)
 	DBUG_ENTER("ha_vogal::update_row");
 
 	// Deleta o registro
-	m_UpdatedRid = share->filter->fetch->id;
+	//m_UpdatedRid = share->filter->fetch->id;
 	int error = delete_row(old_data);
 	if (error)
 		goto error;
@@ -367,14 +370,14 @@ int ha_vogal::update_row(const uchar *old_data, uchar *new_data)
 	error = write_row(new_data);
 
 error:
-	m_UpdatedRid = 0;
+	//m_UpdatedRid = 0;
 	DBUG_RETURN(error);
 }
 
 int ha_vogal::delete_row(const uchar *buf)
 {
 	DBUG_ENTER("ha_vogal::delete_row");
-
+	
 	if (!vogal->getManipulation()->removeFetch(share->filter)) {
 		ERROR("Erro ao excluir colunas da tabela!");
 		DBUG_RETURN(HA_ERR_INTERNAL_ERROR);
@@ -393,11 +396,9 @@ int ha_vogal::rnd_init(bool scan) {
 		share->filter->reset();
 		DBUG_RETURN(0);
 	}
-
 	share->filter = new FilterCursorType();
 	share->filter->cursor = share->cursor;
 	share->filter->cursorOwner = false;
-
 	DBUG_RETURN(0);
 
 error:
@@ -408,9 +409,9 @@ error:
 	DBUG_RETURN(HA_ERR_INTERNAL_ERROR);
 }
 
-int ha_vogal::rnd_end()
-{
+int ha_vogal::rnd_end() {
 	DBUG_ENTER("ha_vogal::rnd_end");
+	
 	if (share->filter) {
 		share->filter->~FilterCursorType();
 		share->filter = NULL;
@@ -465,7 +466,7 @@ error:
 
 int ha_vogal::rnd_next(uchar *buf) {
 	DBUG_ENTER("ha_vogal::rnd_next");
-
+	
 	if (!vogal->getManipulation()->fetch(share->filter)) {
 		ERROR("Erro ao efetuar o fetch!");
 		goto error;
@@ -473,7 +474,7 @@ int ha_vogal::rnd_next(uchar *buf) {
 	
 	if (share->filter->notFound)
 		DBUG_RETURN(HA_ERR_END_OF_FILE);
-
+		
 	if (!vogal2mysql(share->filter->cursor, share->filter->fetch)) {
 		ERROR("Erro ao atualizar a saída para o banco!");
 		goto error;
@@ -495,9 +496,9 @@ void ha_vogal::position(const uchar *record)
 
 int ha_vogal::rnd_pos(uchar *buf, uchar *pos) {
 	DBUG_ENTER("ha_vogal::rnd_pos");
-
+	
 	int error = 0;
-
+	
 	RidCursorType * rid = NULL;
 	SearchInfoType * info = NULL;
 
@@ -545,9 +546,9 @@ THR_LOCK_DATA **ha_vogal::store_lock(THD *thd,
 {
 	DBUG_ENTER("ha_vogal::store_lock");
 	
-  if (lock_type != TL_IGNORE && lock.type == TL_UNLOCK)
-    lock.type=lock_type;
-  *to++= &lock;
+	if (lock_type != TL_IGNORE && lock.type == TL_UNLOCK)
+		lock.type=lock_type;
+	*to++= &lock;
 	
 	DBUG_RETURN(to);
 }
