@@ -1,0 +1,93 @@
+
+#include "vogal_handler.h"
+
+vogal_handler::vogal_handler(){
+	DBUG_ENTER("vogal_handler::vogal_handler");
+	
+	m_Cache = new vogal_cache(this);
+	m_Storage = new vogal_storage(this);
+	m_Definition = new vogal_definition(this);
+	m_Manipulation = new vogal_manipulation(this);
+
+	printf("INICIALIZANDO STORAGE ENGINE VOGAL!\n");
+	if (!ensureSanity())
+		my_error(ER_UNKNOWN_ERROR, MYF(0), "Erro ao testar a sanidade do arquivo de dados!");
+	printf("STORAGE ENGINE VOGAL INICIALIZADO!\n");
+
+	DBUG_LEAVE;
+}
+
+vogal_handler::~vogal_handler(){
+	DBUG_ENTER("vogal_handler::~vogal_handler");
+	
+	if (m_Storage) {
+		m_Storage->~vogal_storage();
+		m_Storage = NULL;
+	}
+	if (m_Cache) {
+		m_Cache->~vogal_cache();
+		m_Cache = NULL;
+	}
+	if (m_Definition) {
+		m_Definition->~vogal_definition();
+		m_Definition = NULL;
+	}
+	if (m_Manipulation) {
+		m_Manipulation->~vogal_manipulation();
+		m_Manipulation = NULL;
+	}
+		
+	DBUG_LEAVE;
+}
+
+vogal_cache* vogal_handler::getCache() {
+	DBUG_ENTER("vogal_handler::getCache");
+	DBUG_RETURN(m_Cache);
+}
+
+vogal_storage* vogal_handler::getStorage() {
+	DBUG_ENTER("vogal_handler::getStorage");
+	DBUG_RETURN(m_Storage);
+}
+
+vogal_definition* vogal_handler::getDefinition() {
+	DBUG_ENTER("vogal_handler::getDefinition");
+	DBUG_RETURN(m_Definition);
+}
+
+vogal_manipulation* vogal_handler::getManipulation() {
+	DBUG_ENTER("vogal_handler::getManipulation");
+	DBUG_RETURN(m_Manipulation);
+}
+
+int vogal_handler::ensureSanity() {
+	DBUG_ENTER("vogal_handler::ensureSanity");
+
+	bool newDatabase = false;
+	bool notOpened = !getStorage()->isOpen();
+	
+	if (!getStorage()->openDatabase()) {
+		if (getStorage()->initialize()) {
+			newDatabase = true;
+		} else {
+			ERROR("Erro ao criar DB");
+			DBUG_RETURN(false);
+		}
+	}
+
+	if (notOpened) {
+		if (!getCache()->bufferize()) {
+			ERROR("Erro ao bufferizar DB");
+			DBUG_RETURN(false);
+		}
+
+		if (newDatabase)
+			if (!getDefinition()->createDataDictionary()) {
+				ERROR("Erro ao criar dicionário de dados");
+				DBUG_RETURN(false);
+			}
+	}
+		
+	DBUG_RETURN(true);
+}
+
