@@ -7,4 +7,4 @@ Key-words: MySQL. Table type. Storage engine.
 
 = Details =
 
-Link to [http://code.google.com/p/vogal/source/browse/trunk/docs/TCC%20-%20Volume%20Final.pdf] full documentation.
+Download full documentation:  [http://code.google.com/p/vogal/source/browse/trunk/docs/TCC%20-%20Volume%20Final.pdf].
